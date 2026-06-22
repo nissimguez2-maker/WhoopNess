@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Type-checking still runs; ESLint isn't configured and must not gate the build.
+  eslint: { ignoreDuringBuilds: true },
   // Dark-only, single-user app. Security headers applied globally.
   async headers() {
     return [

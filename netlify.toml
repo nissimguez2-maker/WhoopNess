@@ -1,9 +1,9 @@
 [build]
-  command = "npm run build"
-  # Next.js build output (the API-created site defaulted publish to the repo root,
-  # which the Next runtime rejects — "publish dir cannot equal the base dir").
+  # Force a clean build — wipe any restored Next/Netlify cache so deletions (e.g.
+  # removed middleware/routes) actually take effect in the output.
+  command = "rm -rf .next .netlify && npm run build"
   publish = ".next"
 
-# Official Next.js runtime — sets up SSR/route handlers, middleware (edge), and caching.
+# Official Next.js runtime — sets up SSR/route handlers and caching.
 [[plugins]]
   package = "@netlify/plugin-nextjs"

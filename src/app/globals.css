@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  /* Calm/medical-grade: off-white on near-black, never pure values (less glare at 07:00). */
+  background-color: #0a0c10;
+}
+
+body {
+  background-color: #0a0c10;
+  color: #eceff4;
+  /* Tabular figures so updating metrics don't jitter the layout. */
+  font-feature-settings: "tnum" 1, "cv05" 1, "ss03" 1;
+  -webkit-font-smoothing: antialiased;
+  /* Respect device safe areas (notch / home indicator) for the one-handed UI. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Premium dark depth: a barely-there top inner highlight on key surfaces. */
+.ws-surface-highlight {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Honor reduced motion everywhere (designed-first, not bolted on). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

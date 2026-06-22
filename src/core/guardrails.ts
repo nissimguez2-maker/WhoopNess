@@ -138,6 +138,45 @@ export function detectRedFlags(input: {
   return { escalate: reasons.length > 0, reasons };
 }
 
+// ── Chat safety: screen a message for a contraindicated exercise request ─────
+const BANNED_KEYWORDS: Array<{ re: RegExp; tag: string; label: string; substituteId: string }> = [
+  { re: /\b(back\s*)?squat(s|ting)?\b|deep squat/i, tag: "deep_knee_flexion", label: "barbell back squat", substituteId: "leg_press_partial" },
+  { re: /\b(running|run|jog(ging)?)\b|treadmill/i, tag: "running", label: "running", substituteId: "stationary_bike" },
+  { re: /\b(box\s*jump|jump(ing|s)?|plyo(metric)?s?)\b/i, tag: "jumping_plyometric", label: "jumping / plyometrics", substituteId: "leg_press_partial" },
+  { re: /\bdead\s*lift(s|ing)?\b/i, tag: "heavy_axial_load", label: "heavy (conventional) deadlift", substituteId: "romanian_deadlift" },
+  { re: /\b(walking\s*)?lunge(s)?\b/i, tag: "deep_lunge", label: "lunges", substituteId: "leg_press_partial" },
+  { re: /\bleg\s*extension(s)?\b/i, tag: "loaded_full_rom_knee_extension", label: "loaded leg extension", substituteId: "seated_leg_curl" },
+];
+
+export interface BannedExerciseScreen {
+  banned: string;
+  constraintLabel: string;
+  substituteName?: string;
+}
+
+/**
+ * Detect a request for a contraindicated movement in a chat message. Deterministic —
+ * the coach uses this to refuse clearly and offer a safe substitute, never relying on
+ * the LLM to "remember" the guardrails.
+ */
+export function screenMessageForBannedExercise(
+  message: string,
+  medical: MedicalProfile,
+): BannedExerciseScreen | null {
+  const blocked = blockedTagSet(medical);
+  for (const k of BANNED_KEYWORDS) {
+    if (k.re.test(message) && blocked.has(k.tag)) {
+      const constraint = medical.hard.find((c) => c.blockedTags.includes(k.tag as never));
+      return {
+        banned: k.label,
+        constraintLabel: constraint?.label ?? "a medical guardrail",
+        substituteName: EXERCISE_BY_ID[k.substituteId]?.name,
+      };
+    }
+  }
+  return null;
+}
+
 // ── internals ────────────────────────────────────────────────────────────────
 function blockedTagSet(medical: MedicalProfile): Set<string> {
   const s = new Set<string>();

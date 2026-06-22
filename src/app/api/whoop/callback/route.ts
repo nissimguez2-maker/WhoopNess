@@ -1,14 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { exchangeCodeForTokens } from "@/lib/whoop/oauth";
 import { storeWhoopTokens } from "@/lib/whoop/tokens";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getOwnerId } from "@/lib/owner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * WHOOP OAuth redirect target (must match WHOOP_REDIRECT_URI). Verifies the CSRF state,
- * exchanges the code for tokens, encrypts + persists them for the signed-in user.
+ * exchanges the code for tokens, encrypts + persists them under the fixed owner id.
  */
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
@@ -24,15 +24,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/?whoop=error&reason=state_mismatch", origin));
   }
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.redirect(new URL("/login", origin));
-
   try {
     const tokens = await exchangeCodeForTokens(code);
-    await storeWhoopTokens(user.id, tokens);
+    await storeWhoopTokens(getOwnerId(), tokens);
     const res = NextResponse.redirect(new URL("/?whoop=connected", origin));
     res.cookies.delete("whoop_oauth_state");
     return res;

@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { buildAuthorizeUrl } from "@/lib/whoop/oauth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,12 +7,6 @@ export const dynamic = "force-dynamic";
 /** Start the WHOOP OAuth flow: stash a CSRF state cookie, redirect to WHOOP's consent. */
 export async function GET(req: NextRequest) {
   const origin = new URL(req.url).origin;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.redirect(new URL("/login", origin));
-
   try {
     const { url, state } = buildAuthorizeUrl();
     const res = NextResponse.redirect(url);

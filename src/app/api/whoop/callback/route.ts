@@ -1,35 +1,43 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { exchangeCodeForTokens } from "@/lib/whoop/oauth";
+import { storeWhoopTokens } from "@/lib/whoop/tokens";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * WHOOP OAuth redirect target (must match WHOOP_REDIRECT_URI).
- * Exchanges the auth code for tokens. The tokens are then encrypted at rest and the
- * refresh token persisted (single-flight rotation) — wired in phase 2 with the DB.
+ * WHOOP OAuth redirect target (must match WHOOP_REDIRECT_URI). Verifies the CSRF state,
+ * exchanges the code for tokens, encrypts + persists them for the signed-in user.
  */
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const url = new URL(req.url);
+  const origin = url.origin;
   const code = url.searchParams.get("code");
   const error = url.searchParams.get("error");
-  // TODO[phase-2]: verify `state` against the value stored at authorize time (CSRF).
+  const state = url.searchParams.get("state");
+  const stateCookie = req.cookies.get("whoop_oauth_state")?.value;
 
-  if (error) {
-    return NextResponse.redirect(new URL(`/?whoop=error&reason=${encodeURIComponent(error)}`, url.origin));
+  if (error) return NextResponse.redirect(new URL(`/?whoop=error&reason=${encodeURIComponent(error)}`, origin));
+  if (!code) return NextResponse.redirect(new URL("/?whoop=error&reason=missing_code", origin));
+  if (!state || !stateCookie || state !== stateCookie) {
+    return NextResponse.redirect(new URL("/?whoop=error&reason=state_mismatch", origin));
   }
-  if (!code) {
-    return NextResponse.redirect(new URL("/?whoop=error&reason=missing_code", url.origin));
-  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.redirect(new URL("/login", origin));
 
   try {
     const tokens = await exchangeCodeForTokens(code);
-    // TODO[phase-2]: encrypt(tokens.refreshToken, APP_ENCRYPTION_KEY) and upsert into
-    // the whoop_tokens table (RLS deny-all to client; service role only).
-    void tokens;
-    return NextResponse.redirect(new URL("/?whoop=connected", url.origin));
+    await storeWhoopTokens(user.id, tokens);
+    const res = NextResponse.redirect(new URL("/?whoop=connected", origin));
+    res.cookies.delete("whoop_oauth_state");
+    return res;
   } catch (e) {
     const reason = e instanceof Error ? e.message : "exchange_failed";
-    return NextResponse.redirect(new URL(`/?whoop=error&reason=${encodeURIComponent(reason)}`, url.origin));
+    return NextResponse.redirect(new URL(`/?whoop=error&reason=${encodeURIComponent(reason)}`, origin));
   }
 }

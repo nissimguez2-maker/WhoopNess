@@ -1,7 +1,8 @@
 [build]
-  # Force a clean build — wipe any restored Next/Netlify cache so deletions (e.g.
-  # removed middleware/routes) actually take effect in the output.
-  command = "rm -rf .next .netlify && npm run build"
+  # Wipe Next's output/cache (restored by Netlify) before building so removed
+  # routes/middleware actually drop out of the deploy. (Do NOT remove .netlify —
+  # that's the plugin's workspace and breaks the build.)
+  command = "rm -rf .next && npm run build"
   publish = ".next"
 
 # Official Next.js runtime — sets up SSR/route handlers and caching.

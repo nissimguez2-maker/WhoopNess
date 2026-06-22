@@ -39,3 +39,7 @@ yarn-error.log*
 # private / medical data — never commit real PHI
 /private/*
 !/private/.gitkeep
+
+# Netlify build artifacts (generated locally by the CLI/build)
+.netlify/
+deno.lock

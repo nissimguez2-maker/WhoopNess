@@ -1,0 +1,6 @@
+[build]
+  command = "npm run build"
+
+# Official Next.js runtime — sets up SSR/route handlers, middleware (edge), and caching.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

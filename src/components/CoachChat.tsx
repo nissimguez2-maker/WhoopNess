@@ -1,86 +1,102 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Card, CardBody, Button, Textarea, Chip, Spinner } from "@heroui/react";
-import { Send, ShieldCheck } from "lucide-react";
-import { askCoach } from "@/app/coach/actions";
+import { Button, Textarea, Chip, Spinner } from "@heroui/react";
+import { Send, ShieldCheck, MessageCircle, Trash2 } from "lucide-react";
+import { askCoach, clearChatHistory } from "@/app/coach/actions";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { CoachTurn } from "@/lib/claude/chat";
 
 const QUICK_PROMPTS = [
   "Should I train today?",
   "Can I do back squats?",
   "What should I eat after lifting?",
-  "Why is today a lighter day?",
+  "Why is today a swim day?",
 ];
 
-const INTRO: CoachTurn = {
-  role: "coach",
-  content:
-    "I'm your coach — calm and to the point. Ask me about today's session, recovery, or fueling. I'll always check requests against your knee and back guardrails.",
-};
-
-export function CoachChat() {
-  const [messages, setMessages] = useState<CoachTurn[]>([INTRO]);
+export function CoachChat({ initialMessages }: { initialMessages: CoachTurn[] }) {
+  const [messages, setMessages] = useState<CoachTurn[]>(initialMessages);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const firstRender = useRef(true);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    endRef.current?.scrollIntoView({ behavior: firstRender.current ? "auto" : "smooth" });
+    firstRender.current = false;
   }, [messages, busy]);
 
   async function send(text: string) {
     const msg = text.trim();
     if (!msg || busy) return;
-    const history = messages.filter((m) => m !== INTRO);
-    const next = [...messages, { role: "user" as const, content: msg }];
-    setMessages(next);
+    setMessages((m) => [...m, { role: "user", content: msg }]);
     setInput("");
     setBusy(true);
-    const reply = await askCoach(history, msg);
+    const reply = await askCoach(msg);
     setMessages((m) => [...m, { role: "coach", content: reply.text }]);
     setBusy(false);
   }
 
+  async function clear() {
+    if (!window.confirm("Clear chat history? This can't be undone.")) return;
+    await clearChatHistory();
+    setMessages([]);
+  }
+
+  const empty = messages.length === 0;
+
   return (
-    <div className="flex h-[calc(100dvh-7rem)] flex-col gap-3">
-      <header>
-        <h1 className="text-xl font-bold">Coach</h1>
-        <p className="text-xs text-foreground-500">Calm, clinical — guardrail-checked</p>
-      </header>
+    <div className="flex h-[calc(100dvh-8.5rem)] flex-col gap-3">
+      <PageHeader
+        title="Coach"
+        subtitle="Calm, clinical — guardrail-checked"
+        action={
+          !empty && (
+            <Button isIconOnly size="sm" variant="light" aria-label="Clear history" onPress={clear} className="text-foreground-500">
+              <Trash2 size={16} />
+            </Button>
+          )
+        }
+      />
 
       <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+        {empty && (
+          <div className="mx-auto mt-10 flex max-w-xs flex-col items-center gap-3 text-center">
+            <MessageCircle size={28} className="text-foreground-500" />
+            <p className="text-sm text-foreground-600">
+              I&apos;m your coach — calm and to the point. Ask about today&apos;s session, recovery, or fueling. I always check
+              requests against your knee and back guardrails.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {QUICK_PROMPTS.map((p) => (
+                <Chip key={p} variant="flat" className="cursor-pointer hover:bg-content3" onClick={() => send(p)}>
+                  {p}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+
         {messages.map((m, i) => (
           <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-            <Card
-              shadow="none"
+            <div
               className={
                 m.role === "user"
-                  ? "max-w-[85%] border border-primary/20 bg-primary/10"
-                  : "ws-surface-highlight max-w-[90%] border border-white/10 bg-content1"
+                  ? "max-w-[85%] rounded-2xl rounded-br-md border border-primary/20 bg-primary/10 px-3.5 py-2.5 text-sm text-foreground"
+                  : "ws-surface-highlight max-w-[90%] rounded-2xl rounded-bl-md bg-content2 px-3.5 py-2.5 text-sm text-foreground"
               }
             >
-              <CardBody className="px-3 py-2 text-sm text-foreground-600">{m.content}</CardBody>
-            </Card>
+              {m.content}
+            </div>
           </div>
         ))}
         {busy && (
           <div className="flex items-center gap-2 text-xs text-foreground-500">
-            <Spinner size="sm" color="primary" /> thinking…
+            <Spinner size="sm" color="secondary" /> thinking…
           </div>
         )}
         <div ref={endRef} />
       </div>
-
-      {messages.length <= 1 && (
-        <div className="flex flex-wrap gap-2">
-          {QUICK_PROMPTS.map((p) => (
-            <Chip key={p} variant="flat" className="cursor-pointer" onClick={() => send(p)}>
-              {p}
-            </Chip>
-          ))}
-        </div>
-      )}
 
       <div className="flex items-end gap-2">
         <Textarea
@@ -89,6 +105,10 @@ export function CoachChat() {
           value={input}
           onValueChange={setInput}
           placeholder="Ask your coach…"
+          variant="bordered"
+          radius="lg"
+          aria-label="Message"
+          classNames={{ inputWrapper: "bg-content2" }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -96,7 +116,7 @@ export function CoachChat() {
             }
           }}
         />
-        <Button isIconOnly color="primary" aria-label="Send" onPress={() => void send(input)} isDisabled={busy}>
+        <Button isIconOnly size="lg" color="primary" aria-label="Send" onPress={() => void send(input)} isDisabled={busy || !input.trim()}>
           <Send size={18} />
         </Button>
       </div>

@@ -1,5 +1,5 @@
 import { llmComplete, type LlmMessage } from "@/lib/llm";
-import type { TodayCard } from "@/lib/mock";
+import type { TodayCard } from "@/lib/today";
 
 /**
  * Daily-card narration. "LLM proposes, rules dispose": the verdict, branch, and fueling

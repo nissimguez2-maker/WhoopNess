@@ -1,33 +1,44 @@
-import { WeeklyPlanView, type SessionView } from "@/components/WeeklyPlanView";
-import { generateWeeklyPlan, estimateDurationMin, type Slot } from "@/core/planner";
-import { NISSIM_MEDICAL_PROFILE, EXERCISE_BY_ID } from "@/core/exercises";
+import { WeeklyPlanView, type SessionVM } from "@/components/WeeklyPlanView";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { getOwnerId } from "@/lib/owner";
+import { isWhoopConnected, getOwnerWhoopFeatures } from "@/lib/whoop/sync";
+import { ensureWeeklyPlan } from "@/lib/plan/store";
+import { estimateDurationMin } from "@/core/planner";
+import { toExerciseViews } from "@/lib/today";
+import type { RecoveryBand } from "@/core/types";
 
-const BRANCH_LABEL = { green: "Primary", amber: "Lighter", red: "Recovery" } as const;
+export const dynamic = "force-dynamic";
 
-// Default slots until the planning ritual + persistence are wired (phase 2).
-const DEFAULT_SLOTS: Slot[] = [
-  { day: "Sun", minutes: 60, time: "21:00" },
-  { day: "Tue", minutes: 60, time: "07:00" },
-  { day: "Thu", minutes: 75, time: "21:00" },
-];
+const LABEL: Record<RecoveryBand, string> = { green: "Primary", amber: "Lighter", red: "Recovery" };
 
-export default function WeekPage() {
-  const plan = generateWeeklyPlan(DEFAULT_SLOTS, NISSIM_MEDICAL_PROFILE, "2026-06-27");
+export default async function WeekPage() {
+  let sessions: SessionVM[] = [];
+  let rationale: string | undefined;
+  let weekLabel = "This week";
 
-  const sessions: SessionView[] = plan.sessions.map((s, i) => ({
-    day: s.day,
-    time: DEFAULT_SLOTS[i]?.time,
-    focus: s.focus,
-    branches: s.branches.map((b) => ({
-      band: b.band,
-      label: BRANCH_LABEL[b.band],
-      durationMin: estimateDurationMin(b),
-      exercises: b.exercises.map((pe) => {
-        const ex = EXERCISE_BY_ID[pe.exerciseId];
-        return { name: ex?.name ?? pe.exerciseId, detail: `${pe.sets} × ${pe.reps}` };
-      }),
-    })),
-  }));
+  try {
+    const admin = getSupabaseAdmin();
+    const ownerId = getOwnerId();
+    const features = (await isWhoopConnected(ownerId)) ? await getOwnerWhoopFeatures(ownerId) : undefined;
+    const plan = await ensureWeeklyPlan(admin, ownerId, features);
+    rationale = plan.rationale;
+    weekLabel = `Week of ${new Date(plan.weekStart).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+    sessions = plan.sessions.map((s) => ({
+      id: s.id,
+      day: s.day,
+      time: s.time,
+      type: s.type,
+      focus: s.focus,
+      branches: s.branches.map((b) => ({
+        band: b.band,
+        label: LABEL[b.band],
+        durationMin: estimateDurationMin(b),
+        exercises: toExerciseViews(b.exercises),
+      })),
+    }));
+  } catch {
+    sessions = [];
+  }
 
-  return <WeeklyPlanView sessions={sessions} weekLabel="Week of 27 Jun" />;
+  return <WeeklyPlanView sessions={sessions} weekLabel={weekLabel} rationale={rationale} />;
 }

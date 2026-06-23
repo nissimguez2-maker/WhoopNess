@@ -3,8 +3,7 @@ import { Watch, CircleAlert } from "lucide-react";
 
 /**
  * The keystone in-app status. With no push notifications, wearing the WHOOP at
- * night is the one habit the whole app depends on — so we surface it on every open,
- * with a calm rolling "nights worn" ledger (not a fragile streak).
+ * night is the one habit the whole app depends on — so we surface it on every open.
  */
 export function KeystoneStatus({
   wornLastNight,
@@ -12,11 +11,11 @@ export function KeystoneStatus({
   ofNights,
 }: {
   wornLastNight: boolean;
-  nightsWorn: number;
-  ofNights: number;
+  nightsWorn?: number;
+  ofNights?: number;
 }) {
   return (
-    <div className="ws-surface-highlight flex items-center justify-between rounded-xl border border-white/10 bg-content1 px-3 py-2">
+    <div className="ws-surface-highlight flex items-center justify-between rounded-xl border border-white/[0.06] bg-content1 px-4 py-3">
       <div className="flex items-center gap-2">
         {wornLastNight ? (
           <Watch size={16} className="text-success-400" aria-hidden />
@@ -24,12 +23,14 @@ export function KeystoneStatus({
           <CircleAlert size={16} className="text-warning-400" aria-hidden />
         )}
         <span className="text-sm text-foreground-600">
-          {wornLastNight ? "WHOOP worn last night" : "No sleep data — was the WHOOP on?"}
+          {wornLastNight ? "WHOOP worn last night" : "No recovery yet — was the WHOOP on?"}
         </span>
       </div>
-      <Chip size="sm" variant="flat" className="font-mono">
-        {nightsWorn}/{ofNights} nights
-      </Chip>
+      {nightsWorn != null && ofNights != null && (
+        <Chip size="sm" variant="flat" className="font-mono">
+          {nightsWorn}/{ofNights} nights
+        </Chip>
+      )}
     </div>
   );
 }

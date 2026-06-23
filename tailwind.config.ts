@@ -48,7 +48,7 @@ const config: Config = {
             content2: "#191D26",
             content3: "#222732",
             content4: "#2C323F",
-            divider: "rgba(255,255,255,0.10)",
+            divider: "rgba(255,255,255,0.06)",
             default: {
               100: "#1B202A",
               400: "#5E6675",

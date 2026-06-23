@@ -1,6 +1,5 @@
 import { detectRedFlags, screenMessageForBannedExercise } from "@/core/guardrails";
 import { NISSIM_MEDICAL_PROFILE } from "@/core/exercises";
-import { buildTodayCard } from "@/lib/mock";
 import { llmComplete, llmConfigured, type LlmMessage } from "@/lib/llm";
 
 export type CoachTurn = { role: "user" | "coach"; content: string };
@@ -20,7 +19,7 @@ Rules:
  *  2) a request for a contraindicated movement → deterministic refusal + safe substitute;
  *  3) otherwise → the LLM (OpenRouter, calm/clinical, grounded) if configured, else an offline reply.
  */
-export async function coachReply(history: CoachTurn[], userMessage: string): Promise<CoachReply> {
+export async function coachReply(history: CoachTurn[], userMessage: string, context?: string): Promise<CoachReply> {
   const medical = NISSIM_MEDICAL_PROFILE;
 
   // 1) Red flags — deterministic, non-negotiable.
@@ -43,22 +42,19 @@ export async function coachReply(history: CoachTurn[], userMessage: string): Pro
   }
 
   // 3) General coaching.
-  const card = buildTodayCard();
-  const context = `Today: recovery ${card.recoveryScore}% (${card.band}), verdict ${card.verdictWord}, session "${card.focus}" (${card.durationMin} min). Goal: maintenance recomposition. Trains 3×/week, gym, low-impact, knee braces on.`;
+  const ctx = context ?? "Goal: maintenance recomposition. Trains 3×/week, gym + swim, low-impact, knee braces on (except swimming).";
 
   if (!llmConfigured()) {
     return {
       source: "offline",
-      text:
-        "Coach is offline until the OpenRouter key is set. From today's card: " +
-        `recovery is ${card.recoveryScore}% (${card.verdictWord}); the plan is "${card.focus}" for ~${card.durationMin} min. Ask me about an exercise and I'll check it against your knee/back guardrails.`,
+      text: "Coach is offline until the OpenRouter key is set. Ask me about an exercise and I'll still check it against your knee/back guardrails.",
     };
   }
 
   const messages: LlmMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
     ...history.map((t) => ({ role: (t.role === "coach" ? "assistant" : "user") as LlmRole, content: t.content })),
-    { role: "user", content: `<context>\n${context}\n</context>\n\n${userMessage}` },
+    { role: "user", content: `<context>\n${ctx}\n</context>\n\n${userMessage}` },
   ];
 
   const text = await llmComplete(messages, { maxTokens: 400 });

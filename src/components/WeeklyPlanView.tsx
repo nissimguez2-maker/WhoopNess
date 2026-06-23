@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CardBody, Select, SelectItem, Input, Tabs, Tab } from "@heroui/react";
+import { CardBody, Select, SelectItem, Input, Button } from "@heroui/react";
 import { Dumbbell, Waves, Check } from "lucide-react";
-import type { SessionType } from "@/core/types";
 import type { ScheduleSlot } from "@/core/schedule";
 import { DAYS } from "@/core/schedule";
 import { SurfaceCard } from "./ui/SurfaceCard";
@@ -15,6 +14,13 @@ export function WeeklyPlanView({ slots: initial }: { slots: ScheduleSlot[] }) {
   const [savedId, setSavedId] = useState<string | null>(null);
 
   async function save(i: number, patch: Partial<ScheduleSlot>) {
+    const cur = slots[i]!;
+    // Only persist a real change (ignore hydration/programmatic events).
+    const changed =
+      (patch.day != null && patch.day !== cur.day) ||
+      (patch.time != null && patch.time !== cur.time) ||
+      (patch.type != null && patch.type !== cur.type);
+    if (!changed) return;
     const next = slots.map((s, idx) => (idx === i ? { ...s, ...patch } : s));
     setSlots(next);
     const s = next[i]!;
@@ -22,7 +28,7 @@ export function WeeklyPlanView({ slots: initial }: { slots: ScheduleSlot[] }) {
     const res = await updateScheduleSlot({ id: s.id, day: s.day, time: s.time, type: s.type });
     if (res.ok) {
       setSavedId(s.id);
-      setTimeout(() => setSavedId((cur) => (cur === s.id ? null : cur)), 1500);
+      setTimeout(() => setSavedId((cur2) => (cur2 === s.id ? null : cur2)), 1500);
     }
   }
 
@@ -49,17 +55,28 @@ export function WeeklyPlanView({ slots: initial }: { slots: ScheduleSlot[] }) {
               )}
             </div>
 
-            <Tabs
-              aria-label="Type"
-              fullWidth
-              size="sm"
-              color="primary"
-              selectedKey={s.type}
-              onSelectionChange={(k) => save(i, { type: k as SessionType })}
-            >
-              <Tab key="gym" title={<div className="flex items-center gap-1.5"><Dumbbell size={14} /> Gym</div>} />
-              <Tab key="swim" title={<div className="flex items-center gap-1.5"><Waves size={14} /> Swim</div>} />
-            </Tabs>
+            <div className="flex gap-2" role="group" aria-label="Type">
+              <Button
+                fullWidth
+                size="sm"
+                variant={s.type === "gym" ? "solid" : "bordered"}
+                color={s.type === "gym" ? "primary" : "default"}
+                startContent={<Dumbbell size={14} />}
+                onPress={() => save(i, { type: "gym" })}
+              >
+                Gym
+              </Button>
+              <Button
+                fullWidth
+                size="sm"
+                variant={s.type === "swim" ? "solid" : "bordered"}
+                color={s.type === "swim" ? "primary" : "default"}
+                startContent={<Waves size={14} />}
+                onPress={() => save(i, { type: "swim" })}
+              >
+                Swim
+              </Button>
+            </div>
 
             <div className="flex gap-2">
               <Select

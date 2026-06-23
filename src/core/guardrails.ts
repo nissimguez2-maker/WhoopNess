@@ -73,6 +73,26 @@ export function validatePlan(plan: WeeklyPlan, medical: MedicalProfile): Validat
             reason: `"${ex.name}" is contraindicated (${badTag}) by: ${c?.label ?? "medical guardrail"}.`,
           });
         }
+
+        // Swim/gym typing invariant — a workout is swim OR gym, never both.
+        if (session.type === "swim" && !ex.tags.includes("swim_eligible")) {
+          violations.push({
+            sessionDay: session.day,
+            band: branch.band,
+            exerciseId: pe.exerciseId,
+            constraintId: "swim_invariant",
+            reason: `"${ex.name}" can't be in a swim session — only swim, push-ups, pull-ups, walking or bike are allowed.`,
+          });
+        }
+        if (session.type === "gym" && pe.exerciseId === "swim_easy") {
+          violations.push({
+            sessionDay: session.day,
+            band: branch.band,
+            exerciseId: pe.exerciseId,
+            constraintId: "gym_invariant",
+            reason: "A swim can't be inside a gym session.",
+          });
+        }
       }
     }
   }

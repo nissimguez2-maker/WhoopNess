@@ -60,6 +60,7 @@ describe("guardrails — L3 validator", () => {
       sessions: [
         {
           day: "Sun",
+          type: "gym",
           focus: "Full body A",
           branches: [
             { band: "green", exercises: [{ exerciseId: "leg_press_partial", sets: 3, reps: "8-10" }, { exerciseId: "chest_press_machine", sets: 3, reps: "8-10" }] },
@@ -78,6 +79,7 @@ describe("guardrails — L3 validator", () => {
       sessions: [
         {
           day: "Sun",
+          type: "gym",
           focus: "Legs",
           branches: [
             { band: "green", exercises: [{ exerciseId: "barbell_back_squat", sets: 5, reps: "5" }] },
@@ -93,7 +95,7 @@ describe("guardrails — L3 validator", () => {
   it("flags unknown / hallucinated exercise ids", () => {
     const plan: WeeklyPlan = {
       weekStart: "2026-06-27",
-      sessions: [{ day: "Mon", focus: "x", branches: [{ band: "green", exercises: [{ exerciseId: "imaginary_lift", sets: 3, reps: "8" }] }] }],
+      sessions: [{ day: "Mon", type: "gym", focus: "x", branches: [{ band: "green", exercises: [{ exerciseId: "imaginary_lift", sets: 3, reps: "8" }] }] }],
     };
     const res = validatePlan(plan, M);
     expect(res.ok).toBe(false);
@@ -103,7 +105,7 @@ describe("guardrails — L3 validator", () => {
   it("catches heavy axial load (back guardrail)", () => {
     const plan: WeeklyPlan = {
       weekStart: "2026-06-27",
-      sessions: [{ day: "Tue", focus: "Pull", branches: [{ band: "green", exercises: [{ exerciseId: "conventional_deadlift", sets: 3, reps: "5" }] }] }],
+      sessions: [{ day: "Tue", type: "gym", focus: "Pull", branches: [{ band: "green", exercises: [{ exerciseId: "conventional_deadlift", sets: 3, reps: "5" }] }] }],
     };
     const res = validatePlan(plan, M);
     expect(res.ok).toBe(false);

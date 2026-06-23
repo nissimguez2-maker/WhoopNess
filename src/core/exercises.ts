@@ -1,12 +1,15 @@
 import type { Exercise, MedicalProfile } from "./types";
 
 /**
- * Seed exercise library with guardrail tags.
+ * Seed exercise library with guardrail tags + coaching detail.
  *
  * ⚠️ SAFETY-CRITICAL CONFIG. The tags below are what the guardrail engine uses to
  * keep contraindicated movements away from a post-MPFL knee with a patellofemoral
  * cartilage defect and a mild thoracic scoliosis. Treat changes like medical config:
  * version, test, and have the user (ideally a physio) approve.
+ *
+ * `swim_eligible` marks the only movements allowed inside a SWIM session
+ * (swim itself + push-ups / pull-ups / walking / bike).
  *
  * The library intentionally INCLUDES contraindicated movements (e.g. back squat,
  * loaded leg extension, box jumps). They must never reach the user — they exist so
@@ -22,6 +25,10 @@ export const EXERCISES: Exercise[] = [
     tags: ["machine_supported", "low_impact", "knee_safe"],
     equipment: "machine",
     fallbackSafe: true,
+    instructions:
+      "Set the seat so your knees never pass ~90°. Press through mid-foot, stop short of lockout, lower under control to the limited depth.",
+    cues: ["Knees track toes", "Don't lock out", "Partial depth only"],
+    defaultRestSec: 120,
   },
   {
     id: "hip_thrust",
@@ -30,6 +37,10 @@ export const EXERCISES: Exercise[] = [
     tags: ["posterior_chain", "knee_safe", "low_impact"],
     equipment: "barbell",
     fallbackSafe: true,
+    instructions:
+      "Upper back on the bench, bar over hips (use a pad). Drive hips up by squeezing glutes until torso is parallel to the floor, then lower under control.",
+    cues: ["Squeeze glutes at top", "Ribs down", "Chin tucked"],
+    defaultRestSec: 120,
   },
   {
     id: "seated_leg_curl",
@@ -38,6 +49,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["machine_supported", "knee_safe", "low_impact"],
     equipment: "machine",
     fallbackSafe: true,
+    instructions: "Curl the pad down by bending the knees, pause briefly, return slowly without letting the weight slam.",
+    cues: ["Controlled tempo", "Full but pain-free range"],
+    defaultRestSec: 75,
   },
   {
     id: "romanian_deadlift",
@@ -47,6 +61,10 @@ export const EXERCISES: Exercise[] = [
     tags: ["posterior_chain", "knee_safe", "low_impact"],
     equipment: "barbell",
     fallbackSafe: true,
+    instructions:
+      "Soft knees, push hips back and slide the bar down your thighs until you feel a hamstring stretch, then drive hips forward to stand. Keep a neutral spine throughout.",
+    cues: ["Hinge at hips", "Neutral spine", "Bar stays close"],
+    defaultRestSec: 120,
   },
   {
     id: "standing_calf_raise",
@@ -55,6 +73,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["machine_supported", "knee_safe", "low_impact"],
     equipment: "machine",
     fallbackSafe: true,
+    instructions: "Rise onto the balls of your feet to full height, pause, then lower the heels below the platform for a stretch.",
+    cues: ["Full height", "Pause at top", "Slow stretch"],
+    defaultRestSec: 60,
   },
   // ── Upper body (knee-irrelevant, back-aware) ──
   {
@@ -65,6 +86,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["machine_supported", "low_impact"],
     equipment: "machine",
     fallbackSafe: true,
+    instructions: "Set the seat so the handles are at mid-chest. Press out and slightly together, stop short of lockout, return under control.",
+    cues: ["Shoulder blades back", "Don't flare elbows", "Smooth tempo"],
+    defaultRestSec: 90,
   },
   {
     id: "incline_db_press",
@@ -74,6 +98,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["low_impact"],
     equipment: "dumbbell",
     fallbackSafe: true,
+    instructions: "Bench at ~30°. Press the dumbbells up and together, lower to the upper chest with elbows ~45°.",
+    cues: ["Elbows at 45°", "Control the lowering"],
+    defaultRestSec: 90,
   },
   {
     id: "chest_supported_row",
@@ -83,6 +110,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["machine_supported", "low_impact", "posterior_chain"],
     equipment: "machine",
     fallbackSafe: true,
+    instructions: "Chest on the pad (protects the spine). Row the handles to your ribs by driving the elbows back, squeeze, then extend the arms fully.",
+    cues: ["Drive elbows back", "Squeeze shoulder blades", "Chest stays on pad"],
+    defaultRestSec: 90,
   },
   {
     id: "lat_pulldown",
@@ -92,6 +122,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["machine_supported", "low_impact"],
     equipment: "cable",
     fallbackSafe: true,
+    instructions: "Pull the bar to your upper chest by leading with the elbows, control the return to a full stretch without shrugging.",
+    cues: ["Lead with elbows", "Chest up", "No swinging"],
+    defaultRestSec: 90,
   },
   {
     id: "seated_shoulder_press",
@@ -101,6 +134,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["machine_supported", "low_impact"],
     equipment: "machine",
     fallbackSafe: true,
+    instructions: "Back supported. Press the handles overhead just short of lockout, lower to ear height under control.",
+    cues: ["Ribs down", "Don't lock out", "Smooth path"],
+    defaultRestSec: 90,
   },
   {
     id: "cable_lateral_raise",
@@ -109,6 +145,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["low_impact"],
     equipment: "cable",
     fallbackSafe: true,
+    instructions: "Raise the arm out to the side to shoulder height with a soft elbow, lower slowly.",
+    cues: ["Lead with the elbow", "Slow negative"],
+    defaultRestSec: 60,
   },
   {
     id: "cable_triceps_pushdown",
@@ -117,6 +156,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["low_impact"],
     equipment: "cable",
     fallbackSafe: true,
+    instructions: "Elbows pinned to your sides, push the handle down to full extension, return slowly.",
+    cues: ["Elbows pinned", "Full extension"],
+    defaultRestSec: 60,
   },
   {
     id: "incline_db_curl",
@@ -125,6 +167,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["low_impact"],
     equipment: "dumbbell",
     fallbackSafe: true,
+    instructions: "Seated on an incline, arms hanging back. Curl without swinging, squeeze, lower slowly to a full stretch.",
+    cues: ["No swing", "Full stretch", "Slow negative"],
+    defaultRestSec: 60,
   },
   {
     id: "face_pull",
@@ -134,6 +179,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["low_impact", "posterior_chain", "core_stability"],
     equipment: "cable",
     fallbackSafe: true,
+    instructions: "Rope at face height. Pull toward your forehead, separating the rope and rotating the shoulders back; return under control.",
+    cues: ["Elbows high", "Squeeze rear delts", "Tall posture"],
+    defaultRestSec: 60,
   },
   {
     id: "pallof_press",
@@ -142,6 +190,9 @@ export const EXERCISES: Exercise[] = [
     tags: ["core_stability", "low_impact", "knee_safe"],
     equipment: "cable",
     fallbackSafe: true,
+    instructions: "Side-on to the cable. Press the handle straight out and resist the rotation, hold, return to your chest.",
+    cues: ["Brace core", "Resist the twist", "Hips square"],
+    defaultRestSec: 45,
   },
   {
     id: "dead_bug",
@@ -150,23 +201,69 @@ export const EXERCISES: Exercise[] = [
     tags: ["core_stability", "low_impact", "knee_safe"],
     equipment: "bodyweight",
     fallbackSafe: true,
+    instructions: "On your back, arms up, knees over hips. Lower an opposite arm and leg while pressing your low back into the floor; alternate.",
+    cues: ["Low back flat", "Slow + controlled", "Exhale on reach"],
+    defaultRestSec: 45,
+  },
+  // ── Swim-eligible movements (swim session pool) ──
+  {
+    id: "push_up",
+    name: "Push-up",
+    primaryMuscle: "chest",
+    secondaryMuscles: ["triceps", "shoulders", "core"],
+    tags: ["low_impact", "swim_eligible"],
+    equipment: "bodyweight",
+    fallbackSafe: true,
+    instructions: "Hands under shoulders, body in one line. Lower the chest to just above the floor with elbows ~45°, press back up. Drop to knees if needed.",
+    cues: ["Body in one line", "Brace core", "Elbows 45°"],
+    defaultRestSec: 75,
+  },
+  {
+    id: "pull_up",
+    name: "Pull-up / assisted pull-up",
+    primaryMuscle: "back",
+    secondaryMuscles: ["biceps"],
+    tags: ["low_impact", "swim_eligible"],
+    equipment: "bodyweight",
+    fallbackSafe: true,
+    instructions: "Hang from the bar (use a band/machine assist as needed). Pull your chest toward the bar by driving the elbows down, lower under control to a full hang.",
+    cues: ["Drive elbows down", "Control the descent", "Avoid kipping"],
+    defaultRestSec: 90,
+  },
+  {
+    id: "walking",
+    name: "Walk (brisk, flat)",
+    primaryMuscle: "quads",
+    tags: ["low_impact", "knee_safe", "swim_eligible"],
+    equipment: "cardio",
+    fallbackSafe: true,
+    isDuration: true,
+    instructions: "Brisk flat walk at a conversational pace. Easy on the knee and good active recovery.",
+    cues: ["Flat ground", "Conversational pace"],
   },
   // ── Knee-safe conditioning ──
   {
     id: "stationary_bike",
     name: "Stationary bike (Z2)",
     primaryMuscle: "quads",
-    tags: ["low_impact", "knee_safe"],
+    tags: ["low_impact", "knee_safe", "swim_eligible"],
     equipment: "cardio",
     fallbackSafe: true,
+    isDuration: true,
+    instructions: "Set the seat so the knee stays slightly bent at the bottom. Ride at an easy, steady Zone-2 effort you can hold a conversation through.",
+    cues: ["Seat high enough", "Steady Z2 effort"],
   },
   {
     id: "swim_easy",
-    name: "Easy swim",
+    name: "Swim",
     primaryMuscle: "back",
-    tags: ["low_impact", "knee_safe"],
+    secondaryMuscles: ["shoulders", "chest", "core"],
+    tags: ["low_impact", "knee_safe", "swim_eligible"],
     equipment: "cardio",
     fallbackSafe: true,
+    isDuration: true,
+    instructions: "Steady freestyle/breaststroke laps at an easy-to-moderate effort. Excellent low-impact full-body work — no brace needed in the water.",
+    cues: ["Relax + breathe", "Easy-moderate pace", "Mix strokes"],
   },
   // ── CONTRAINDICATED — present only so the engine can strip/catch them ──
   {

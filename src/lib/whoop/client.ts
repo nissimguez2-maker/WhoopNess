@@ -45,3 +45,57 @@ export function fetchSleepById(sleepId: string, accessToken: string) {
 export function fetchWorkoutById(workoutId: string, accessToken: string) {
   return get(`/v2/activity/workout/${workoutId}`, accessToken);
 }
+
+// ── Range fetches for the smart planner ──────────────────────────────────────
+export interface RecoveryPoint {
+  date: string;
+  recoveryScore: number;
+  hrvMs?: number;
+  restingHr?: number;
+}
+export interface StrainPoint {
+  date: string;
+  strain: number;
+}
+export interface SleepPoint {
+  date: string;
+  performancePct?: number;
+}
+
+function sinceParams(days: number): string {
+  const start = new Date(Date.now() - days * 86_400_000).toISOString();
+  return `start=${encodeURIComponent(start)}&limit=25`;
+}
+
+export async function fetchRecoveryRange(accessToken: string, days = 28): Promise<RecoveryPoint[]> {
+  const data = await get<{ records: Array<{ created_at?: string; score?: { recovery_score: number; hrv_rmssd_milli?: number; resting_heart_rate?: number } }> }>(
+    `/v2/recovery?${sinceParams(days)}`,
+    accessToken,
+  );
+  return (data.records ?? [])
+    .filter((r) => r.score)
+    .map((r) => ({
+      date: r.created_at ?? "",
+      recoveryScore: r.score!.recovery_score,
+      hrvMs: r.score!.hrv_rmssd_milli,
+      restingHr: r.score!.resting_heart_rate,
+    }));
+}
+
+export async function fetchStrainRange(accessToken: string, days = 28): Promise<StrainPoint[]> {
+  const data = await get<{ records: Array<{ start?: string; score?: { strain: number } }> }>(
+    `/v2/cycle?${sinceParams(days)}`,
+    accessToken,
+  );
+  return (data.records ?? [])
+    .filter((r) => r.score)
+    .map((r) => ({ date: r.start ?? "", strain: r.score!.strain }));
+}
+
+export async function fetchSleepRange(accessToken: string, days = 28): Promise<SleepPoint[]> {
+  const data = await get<{ records: Array<{ start?: string; score?: { sleep_performance_percentage?: number } }> }>(
+    `/v2/activity/sleep?${sinceParams(days)}`,
+    accessToken,
+  );
+  return (data.records ?? []).map((r) => ({ date: r.start ?? "", performancePct: r.score?.sleep_performance_percentage }));
+}

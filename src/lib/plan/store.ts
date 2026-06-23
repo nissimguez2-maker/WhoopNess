@@ -29,30 +29,46 @@ async function ensurePlanContainer(admin: SupabaseClient, userId: string): Promi
   return created.id as string;
 }
 
+async function latestContainerId(admin: SupabaseClient, userId: string): Promise<string | null> {
+  const { data } = await admin
+    .from("weekly_plans")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data?.id as string) ?? null;
+}
+
 /** Load the weekly schedule (1 swim + 2 gym); create the default if none exists. */
 export async function ensureSchedule(admin: SupabaseClient, userId: string): Promise<ScheduleSlot[]> {
-  const existing = await loadSchedule(admin, userId);
-  if (existing.length > 0) return existing;
   const planId = await ensurePlanContainer(admin, userId);
-  await admin.from("planned_sessions").insert(
-    DEFAULT_SCHEDULE.map((s) => ({
-      plan_id: planId,
-      user_id: userId,
-      day: s.day,
-      slot_time: s.time,
-      session_type: s.type,
-      focus: s.type === "swim" ? "Swim" : "Gym",
-      branches: [],
-    })),
-  );
+  const { data: existing } = await admin.from("planned_sessions").select("id").eq("user_id", userId).eq("plan_id", planId);
+  if (!existing || existing.length === 0) {
+    await admin.from("planned_sessions").insert(
+      DEFAULT_SCHEDULE.map((s) => ({
+        plan_id: planId,
+        user_id: userId,
+        day: s.day,
+        slot_time: s.time,
+        session_type: s.type,
+        focus: s.type === "swim" ? "Swim" : "Gym",
+        branches: [],
+      })),
+    );
+  }
   return loadSchedule(admin, userId);
 }
 
+/** Read ONLY the latest container's slots (prevents accumulation across old plans). */
 export async function loadSchedule(admin: SupabaseClient, userId: string): Promise<ScheduleSlot[]> {
+  const containerId = await latestContainerId(admin, userId);
+  if (!containerId) return [];
   const { data } = await admin
     .from("planned_sessions")
     .select("id, day, slot_time, session_type")
     .eq("user_id", userId)
+    .eq("plan_id", containerId)
     .order("slot_time", { ascending: true });
   return (data ?? []).map((r) => ({
     id: r.id as string,

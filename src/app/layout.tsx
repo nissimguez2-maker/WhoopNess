@@ -1,25 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Fustat } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { BottomNav } from "@/components/BottomNav";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const jetbrains = JetBrains_Mono({
+// Fustat — humanist, rounded, warm. One family for everything (headings, body, numbers).
+const fustat = Fustat({
   subsets: ["latin"],
-  variable: "--font-jetbrains",
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-fustat",
   display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "WhoopNess",
-  description: "Your private daily training decision, read from your WHOOP data.",
+  description: "Your private daily training, read from your WHOOP.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "WhoopNess" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "WhoopNess" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0A0C10",
+  themeColor: "#FBF5DD",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -27,7 +28,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`dark ${inter.variable} ${jetbrains.variable}`}>
+    <html lang="en" className={`light ${fustat.variable}`}>
       <body className="font-sans antialiased">
         <Providers>
           {/* Single column, mobile-first; centered on larger screens. */}

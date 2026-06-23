@@ -123,7 +123,7 @@ export function buildDaySession(type: SessionType, band: RecoveryBand, date: str
     cooldown: opts.fallbackWalk ? ["Ease off the last few minutes.", "Gentle calf, quad and hip stretch when you finish."] : [...COOLDOWN[kind]],
     rationale:
       opts.rationale ??
-      `${opts.fallbackWalk ? "Gym/pool wasn't on today — a brisk hour walk keeps the streak and is easy on the knee." : isSwim ? "Swim day: a little strength on land first, then low-impact laps." : "Balanced gym day across push, pull, legs and core, tuned to today's recovery."}`,
+      `${opts.fallbackWalk ? "Gym and pool are out today, so a brisk hour-long walk keeps things moving and stays easy on the knee." : isSwim ? "Swim day. A little strength on land first, then easy laps." : "A full gym day across push, pull, legs and core, sized to how you're recovering."}`,
     proteinTargetG: proteinTargetG(opts.bodyweightKg ?? 78),
     isFallbackWalk: opts.fallbackWalk,
   };

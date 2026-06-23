@@ -69,7 +69,7 @@ export default async function Home() {
       />
 
       <Link href="/week" className="text-center text-xs text-foreground-500">
-        Your week: 1 swim + 2 gym — tap to set days &amp; times →
+        Your week: 1 swim, 2 gym. Tap to set days and times →
       </Link>
     </div>
   );

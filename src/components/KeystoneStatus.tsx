@@ -15,7 +15,7 @@ export function KeystoneStatus({
   ofNights?: number;
 }) {
   return (
-    <div className="ws-surface-highlight flex items-center justify-between rounded-xl border border-white/[0.06] bg-content1 px-4 py-3">
+    <div className="flex items-center justify-between rounded-xl border border-divider bg-content1 px-4 py-3">
       <div className="flex items-center gap-2">
         {wornLastNight ? (
           <Watch size={16} className="text-success-400" aria-hidden />
@@ -23,7 +23,7 @@ export function KeystoneStatus({
           <CircleAlert size={16} className="text-warning-400" aria-hidden />
         )}
         <span className="text-sm text-foreground-600">
-          {wornLastNight ? "WHOOP worn last night" : "No recovery yet — was the WHOOP on?"}
+          {wornLastNight ? "WHOOP worn last night" : "No recovery score yet. Did you wear the WHOOP?"}
         </span>
       </div>
       {nightsWorn != null && ofNights != null && (

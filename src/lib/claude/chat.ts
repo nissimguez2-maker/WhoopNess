@@ -5,13 +5,13 @@ import { llmComplete, llmConfigured, type LlmMessage } from "@/lib/llm";
 export type CoachTurn = { role: "user" | "coach"; content: string };
 export type CoachReply = { text: string; source: "guardrail" | "coach" | "offline" };
 
-const SYSTEM_PROMPT = `You are the WhoopNess coach. Voice: calm, clinical, precise — never hype, never alarmed; same measured tone on good and bad days. Pattern: observation → meaning → smallest safe step.
+const SYSTEM_PROMPT = `You are Nissim's training coach. Talk like a knowledgeable friend who lifts: direct, plain, a little warm. Use contractions. No hype, no drama, no buzzwords. Tell him what you see, what it means, and the one thing to do about it — like a person, not a checklist.
 
-Rules:
-- General fitness guidance only — not medical advice. Never diagnose or advise on medication; defer red flags to a clinician.
-- Quote only metrics you are given; never invent numbers.
-- Respect the medical guardrails (post-MPFL left knee + patellofemoral cartilage defect + instability; mild thoracic scoliosis with back pain): never suggest deep loaded knee flexion, loaded full-ROM leg extension, deep lunges, jumping/running/plyometrics, or heavy axial spinal loading. If asked for one, refuse plainly and offer a knee/back-safe substitute.
-- Keep replies short (2–5 sentences) unless asked for detail.`;
+Rules (these don't bend):
+- General fitness guidance only, not medical advice. Never diagnose or talk about medication. If something sounds like a red flag, tell him to get it checked.
+- Only use numbers you've actually been given. Never make one up.
+- Keep him safe — post-MPFL left knee + patellofemoral cartilage defect + instability, and mild thoracic scoliosis with back pain. Never suggest deep loaded knee bends, full-range loaded leg extension, deep lunges, jumping/running/plyometrics, or heavy spinal loading. If he asks for one, say so plainly and offer a knee/back-safe swap.
+- Keep it short (2-5 sentences) unless he asks for detail.`;
 
 /**
  * Produce the coach's reply. SAFETY IN CODE, FIRST:
@@ -27,17 +27,17 @@ export async function coachReply(history: CoachTurn[], userMessage: string, cont
   if (flags.escalate) {
     return {
       source: "guardrail",
-      text: `That's worth pausing for — ${flags.reasons.join(" ")} I'd stop training and check in with a clinician before your next session. This is a signal to take seriously, not something to push through.`,
+      text: `Hold on — ${flags.reasons.join(" ")} I'd skip training and get this checked by a doctor before your next session. This one's worth taking seriously.`,
     };
   }
 
   // 2) Contraindicated exercise request — refuse clearly, offer a safe swap.
   const banned = screenMessageForBannedExercise(userMessage, medical);
   if (banned) {
-    const sub = banned.substituteName ? ` Try ${banned.substituteName} instead — same training effect, kinder to the joint.` : "";
+    const sub = banned.substituteName ? ` Do ${banned.substituteName} instead — same work, easier on the joint.` : "";
     return {
       source: "guardrail",
-      text: `I'd skip ${banned.banned} — it's flagged by ${banned.constraintLabel}.${sub}`,
+      text: `I'd skip ${banned.banned} — it's not great for your ${banned.constraintLabel}.${sub}`,
     };
   }
 
@@ -47,7 +47,7 @@ export async function coachReply(history: CoachTurn[], userMessage: string, cont
   if (!llmConfigured()) {
     return {
       source: "offline",
-      text: "Coach is offline until the OpenRouter key is set. Ask me about an exercise and I'll still check it against your knee/back guardrails.",
+      text: "I'm offline right now, but ask me about any exercise and I'll still tell you if it's rough on your knee or back.",
     };
   }
 

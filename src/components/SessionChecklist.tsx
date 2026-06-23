@@ -152,7 +152,7 @@ export function SessionChecklist({
                   <li key={i}>{o}</li>
                 ))}
               </ul>
-              <p className="mt-2 text-[11px] text-foreground-500">Kosher — no option mixes meat with dairy.</p>
+              <p className="mt-2 text-[11px] text-foreground-500">Kosher: no option mixes meat with dairy.</p>
             </AccordionItem>
           </Accordion>
         </CardBody>
@@ -162,7 +162,7 @@ export function SessionChecklist({
       <Button color="primary" size="lg" className="font-semibold" onPress={logSession} isLoading={saving} isDisabled={logged} startContent={logged ? <CheckCircle2 size={18} /> : undefined}>
         {logged ? "Logged ✓" : "Log session"}
       </Button>
-      {logged && <p className="text-center text-xs text-foreground-500">Saved — the coach will use this for your next session.</p>}
+      {logged && <p className="text-center text-xs text-foreground-500">Saved. I&apos;ll use this for next time.</p>}
     </div>
   );
 }

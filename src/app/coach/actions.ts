@@ -8,7 +8,7 @@ import { getOwnerRecovery } from "@/lib/whoop/sync";
 /** Send a message: persist it, build live context, reply, persist the reply. */
 export async function askCoach(message: string): Promise<CoachReply> {
   const clean = message.trim().slice(0, 2000);
-  if (!clean) return { source: "offline", text: "Ask me anything about today's training, recovery, or fueling." };
+  if (!clean) return { source: "offline", text: "What's on your mind — today's session, your knee, food?" };
 
   try {
     const admin = getSupabaseAdmin();
@@ -41,7 +41,7 @@ export async function askCoach(message: string): Promise<CoachReply> {
     try {
       return await coachReply([], clean);
     } catch {
-      return { source: "offline", text: "Something went wrong reaching the coach. Try again in a moment." };
+      return { source: "offline", text: "Couldn't reach me just now. Give it a second and try again." };
     }
   }
 }

@@ -34,10 +34,10 @@ export function WeeklyPlanView({ slots: initial }: { slots: ScheduleSlot[] }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="Week" subtitle="1 swim + 2 gym — set your days & times" />
+      <PageHeader title="Week" subtitle="1 swim, 2 gym. Set your days and times." />
 
       <p className="px-1 text-xs text-foreground-500">
-        Exercises aren&apos;t fixed here — each session is generated on the day from your live WHOOP recovery and recent training.
+        Exercises aren&apos;t set here. I build each session on the day from your recovery and recent training.
       </p>
 
       {slots.map((s, i) => (
@@ -97,7 +97,7 @@ export function WeeklyPlanView({ slots: initial }: { slots: ScheduleSlot[] }) {
       ))}
 
       <p className="text-center text-xs text-foreground-500">
-        Open <span className="text-primary-400">Today</span> on a training day and tap Generate to get your session.
+        Open <span className="text-primary-400">Today</span> on a training day and tap Build to get your session.
       </p>
     </div>
   );

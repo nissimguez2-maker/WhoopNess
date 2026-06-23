@@ -74,13 +74,13 @@ async function authorWithLlm(input: GenerateDayInput, baseline: DaySession): Pro
     .map((l) => `${l.date} ${l.type}: ${l.exercises.map((e) => `${e.name}${e.weightKg ? ` ${e.weightKg}kg` : ""}${e.reps ? `×${e.reps}` : ""}`).join(", ")}`)
     .join("\n") || "(no logged sessions yet)";
 
-  const system = `You are an expert S&C coach + physiotherapist building ONE training session for today. Calm, precise.
+  const system = `You're Nissim's coach — you know strength training and knee/back rehab cold — building today's one session. Write like a person, not a textbook.
 
 HARD RULES:
 - Use ONLY exerciseId values from the ALLOWED list. Never invent movements.
-- ${input.type === "swim" ? "This is a SWIM session: include 1–2 companion exercises (push-ups/pull-ups/bike/walk) FIRST, then 'swimming' LAST (he's wet after)." : "This is a GYM session: ~5 exercises spread across push, pull, legs and core (knee/back-safe)."}
-- Tune volume/intensity to today's recovery. Progress loads sensibly from his recent logs (small steps; cap ~10%/week).
-- Vary from his last session so the week stays balanced across categories.
+- ${input.type === "swim" ? "This is a SWIM session: 1-2 companion exercises (push-ups/pull-ups/bike/walk) FIRST, then 'swimming' LAST (you're wet after)." : "This is a GYM session: ~5 exercises across push, pull, legs and core (knee/back-safe)."}
+- Tune volume and intensity to today's recovery. Progress loads sensibly from your recent logs (small steps; cap ~10%/week).
+- Vary from your last session so the week stays balanced across categories.
 - Output STRICT JSON only.`;
 
   const user = `DATE: ${input.date}
@@ -98,7 +98,7 @@ ALLOWED exerciseId list:
 ${allowedSummary}
 
 Return JSON:
-{"rationale":"2-3 sentences citing his recovery + how this builds on recent sessions","exercises":[{"exerciseId":"id","sets":3,"reps":"8-12","loadKg":60}]}
+{"rationale":"1-2 plain sentences to Nissim: why today looks like this given your recovery, and how it builds on recent sessions","exercises":[{"exerciseId":"id","sets":3,"reps":"8-12","loadKg":60}]}
 For cardio/swim use {"exerciseId":"id","durationMin":20} (omit sets/reps/load).`;
 
   const text = await llmComplete(

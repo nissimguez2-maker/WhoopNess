@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Button, Textarea, Chip, Spinner } from "@heroui/react";
+import { Button, Textarea, Chip } from "@heroui/react";
 import { Send, ShieldCheck, MessageCircle, Trash2 } from "lucide-react";
 import { askCoach, clearChatHistory } from "@/app/coach/actions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -38,7 +38,7 @@ export function CoachChat({ initialMessages }: { initialMessages: CoachTurn[] })
   }
 
   async function clear() {
-    if (!window.confirm("Clear chat history? This can't be undone.")) return;
+    if (!window.confirm("Clear this conversation? This can't be undone.")) return;
     await clearChatHistory();
     setMessages([]);
   }
@@ -46,26 +46,26 @@ export function CoachChat({ initialMessages }: { initialMessages: CoachTurn[] })
   const empty = messages.length === 0;
 
   return (
-    <div className="flex h-[calc(100dvh-8.5rem)] flex-col gap-3">
+    <div className="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom)-5rem)] flex-col gap-3">
       <PageHeader
         title="Coach"
-        subtitle="Calm, clinical — guardrail-checked"
+        subtitle="Ask about today's session, your knee, or food"
         action={
           !empty && (
-            <Button isIconOnly size="sm" variant="light" aria-label="Clear history" onPress={clear} className="text-foreground-500">
+            <Button isIconOnly size="md" variant="light" aria-label="Clear conversation" onPress={clear} className="text-foreground-500">
               <Trash2 size={16} />
             </Button>
           )
         }
       />
 
-      <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+      <div role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-4 overflow-y-auto pr-1">
         {empty && (
           <div className="mx-auto mt-10 flex max-w-xs flex-col items-center gap-3 text-center">
             <MessageCircle size={28} className="text-foreground-500" />
             <p className="text-sm text-foreground-600">
-              I&apos;m your coach — calm and to the point. Ask about today&apos;s session, recovery, or fueling. I always check
-              requests against your knee and back guardrails.
+              Ask me about today&apos;s session, how you&apos;re recovering, or what to eat. I&apos;ll always keep things safe for your
+              knee and back.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               {QUICK_PROMPTS.map((p) => (
@@ -77,22 +77,20 @@ export function CoachChat({ initialMessages }: { initialMessages: CoachTurn[] })
           </div>
         )}
 
-        {messages.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-            <div
-              className={
-                m.role === "user"
-                  ? "max-w-[85%] rounded-2xl rounded-br-md border border-primary/20 bg-primary/10 px-3.5 py-2.5 text-sm text-foreground"
-                  : "ws-surface-highlight max-w-[90%] rounded-2xl rounded-bl-md bg-content2 px-3.5 py-2.5 text-sm text-foreground"
-              }
-            >
-              {m.content}
+        {messages.map((m, i) =>
+          m.role === "user" ? (
+            <div key={i} className="flex justify-end">
+              <p className="max-w-[88%] rounded-2xl bg-content2 px-3.5 py-2 text-sm text-foreground-700">{m.content}</p>
             </div>
-          </div>
-        ))}
+          ) : (
+            <div key={i} className="border-l-2 border-primary/60 pl-3.5">
+              <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">{m.content}</p>
+            </div>
+          ),
+        )}
         {busy && (
-          <div className="flex items-center gap-2 text-xs text-foreground-500">
-            <Spinner size="sm" color="secondary" /> thinking…
+          <div className="border-l-2 border-primary/30 pl-3.5 text-sm text-foreground-500" role="status">
+            <span className="animate-pulse">one sec…</span>
           </div>
         )}
         <div ref={endRef} />
@@ -104,11 +102,11 @@ export function CoachChat({ initialMessages }: { initialMessages: CoachTurn[] })
           maxRows={4}
           value={input}
           onValueChange={setInput}
-          placeholder="Ask your coach…"
+          placeholder="Ask me anything…"
           variant="bordered"
           radius="lg"
           aria-label="Message"
-          classNames={{ inputWrapper: "bg-content2" }}
+          classNames={{ inputWrapper: "bg-content1" }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -121,7 +119,7 @@ export function CoachChat({ initialMessages }: { initialMessages: CoachTurn[] })
         </Button>
       </div>
       <p className="flex items-center justify-center gap-1 text-center text-[11px] text-foreground-500">
-        <ShieldCheck size={12} /> General guidance, not medical advice. Red flags → see a clinician.
+        <ShieldCheck size={12} /> General guidance, not medical advice. Anything sharp → see a doctor.
       </p>
     </div>
   );

@@ -7,10 +7,10 @@ import { SurfaceCard } from "./ui/SurfaceCard";
 import { PageHeader } from "./ui/PageHeader";
 import { EmptyState } from "./ui/EmptyState";
 
-const TEAL = "#3FB6C6";
-const GRID = "rgba(255,255,255,0.08)";
-const TICK = "#8A93A1";
-const tooltipStyle = { background: "#12151C", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, fontSize: 12, color: "#ECEFF4" };
+const LINE = "#306D29";
+const GRID = "rgba(20,56,15,0.10)";
+const TICK = "#355E2C";
+const tooltipStyle = { background: "#FBF5DD", border: "1px solid rgba(20,56,15,0.18)", borderRadius: 12, fontSize: 12, color: "#14380F" };
 
 function ChartCard({ title, soWhat, children }: { title: string; soWhat: string; children: React.ReactNode }) {
   return (
@@ -30,18 +30,18 @@ export function TrendsView({ recovery }: { recovery: Array<{ date: string; score
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="Trends" subtitle="Strength first — the scale in context" />
+      <PageHeader title="Trends" subtitle="Your strength and recovery over time" />
 
-      <ChartCard title="Strength (estimated 1RM)" soWhat="Your #1 metric — appears once you log a few sessions.">
+      <ChartCard title="Strength (estimated 1RM)" soWhat="Appears once you've logged a few gym sessions.">
         <EmptyState
           className="h-[180px]"
           icon={<Dumbbell size={26} />}
-          title="Collecting baseline"
-          body="Log a few gym sessions and your estimated 1RM trend will appear here."
+          title="Nothing here yet"
+          body="Log a few gym sessions and your estimated 1RM trend shows up here."
         />
       </ChartCard>
 
-      <ChartCard title="Weekly volume" soWhat="Hard sets per muscle — the input that earns the strength.">
+      <ChartCard title="Weekly volume" soWhat="Hard sets per muscle each week.">
         <EmptyState
           className="h-[160px]"
           icon={<BarChart3 size={26} />}
@@ -50,7 +50,7 @@ export function TrendsView({ recovery }: { recovery: Array<{ date: string; score
         />
       </ChartCard>
 
-      <ChartCard title="Recovery (WHOOP)" soWhat="Your readiness trend — the brake the plan respects.">
+      <ChartCard title="Recovery (WHOOP)" soWhat="When this drops, I ease the plan off.">
         {hasRecovery ? (
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={recoveryData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
@@ -58,7 +58,7 @@ export function TrendsView({ recovery }: { recovery: Array<{ date: string; score
               <XAxis dataKey="i" hide />
               <YAxis domain={[0, 100]} tick={{ fill: TICK, fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, "Recovery"]} labelFormatter={() => ""} />
-              <Line type="monotone" dataKey="score" stroke={TEAL} strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="score" stroke={LINE} strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         ) : (
@@ -71,17 +71,17 @@ export function TrendsView({ recovery }: { recovery: Array<{ date: string; score
         )}
       </ChartCard>
 
-      <ChartCard title="Harmony" soWhat="Muscle balance from training volume — the goal is even, calm teal.">
+      <ChartCard title="Harmony" soWhat="How evenly you're training each muscle group.">
         <EmptyState
           className="h-[180px]"
           icon={<PersonStanding size={26} />}
-          title="Not measured yet"
-          body="Log this week's sets to see your balance light up."
+          title="Nothing here yet"
+          body="Log this week's sets and your muscle balance shows up here."
         />
       </ChartCard>
 
       <p className="text-center text-[11px] text-foreground-500">
-        Charts fill in as your WHOOP data and training logs accumulate — no demo data.
+        These fill in as you train and wear your WHOOP.
       </p>
     </div>
   );

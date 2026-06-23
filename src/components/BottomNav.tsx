@@ -16,7 +16,7 @@ export function BottomNav() {
   const pathname = usePathname();
   return (
     <nav
-      className="ws-surface-highlight fixed inset-x-0 bottom-0 z-50 border-t border-divider bg-content1"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-divider bg-content1"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Primary"
     >

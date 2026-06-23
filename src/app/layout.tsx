@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   title: "WhoopNess",
   description: "Your private daily training, read from your WHOOP.",
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
   appleWebApp: { capable: true, statusBarStyle: "default", title: "WhoopNess" },
 };
 

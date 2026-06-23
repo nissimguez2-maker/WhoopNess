@@ -83,8 +83,12 @@ export default async function Home() {
               WHOOP
             </Chip>
           ) : (
-            <a href="/api/whoop/connect" className="flex items-center gap-1 whitespace-nowrap text-xs text-primary-400">
-              <Link2 size={14} /> Connect WHOOP
+            <a
+              href="/api/whoop/connect"
+              aria-label="Connect WHOOP"
+              className="inline-flex items-center gap-1.5 rounded-medium bg-primary/15 px-3 py-2 text-sm font-medium text-primary-400"
+            >
+              <Link2 size={14} /> Connect
             </a>
           )
         }

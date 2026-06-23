@@ -32,33 +32,33 @@ Fixes: `OPENROUTER_MODEL_PLAN ?? "<strong>"`; move coach post-reply DB insert ou
 
 ## Plan by phase
 
-### P0 — Stop feeling broken / AI-made (quick wins)
+### P0 — Stop feeling broken / AI-made  ✅ shipped
 - [x] Earthy + Fustat theme inversion (tokens, globals, layout, providers, manifest, surfaces)
 - [x] Recovery hero on Today (wire the dropped score + VERDICT word)
 - [x] Kill `Sparkles` on the action button
 - [x] Replace ChatGPT bubbles with an editorial transcript
 - [x] Rewrite the two system prompts to a human voice + de-dash the worst copy
-- [ ] Fix the UTC-vs-local day bug (one local-day helper for weekday + `card_date`)
-- [ ] Per-day log idempotency + draft persistence (localStorage); rehydrate logged state
-- [ ] PWA icons in `public/` (192/512/maskable + apple-touch) + minimal app-shell service worker
-- [ ] Pin plan model w/ strong fallback; fix coach double-bill
+- [x] Fix the UTC-vs-local day bug (one local-day helper for weekday + `card_date`)
+- [x] Per-day log idempotency + draft persistence (localStorage); rehydrate logged state
+- [x] PWA icon (SVG) + valid manifest  ·  ⚠ PNG 192/512 + service worker still TODO
+- [x] Pin plan model w/ strong fallback; fix coach double-bill
 
-### P1 — Finish the redesign
-- [ ] Surface hierarchy (hero vs secondary vs unboxed lists); retire uniform card recipe
-- [ ] One bespoke recovery visualization (SVG, not stock CircularProgress)
-- [ ] Delete dead code/deps (old type family, `validatePlan`/`selectBranch`, `fueling.ts`, 6 `export {}` stubs, `zustand`/`framer-motion`/react-query)
-- [ ] Header/branding consistency
+### P2 — Close the loop + real intelligence  ✅ shipped
+- [x] Full logging fields: treadmill speed/incline/distance, bike resistance, swim distance, RPE, per-set, pain/soreness note + session note; all carried to the AI
+- [x] Wire Trends e1RM (from `session_logs`) + bodyweight trend + weigh-in; cut Harmony/volume; recovery chart now has dates  ·  ⚠ lazy-load recharts still TODO
+- [x] Ground the coach (today's session + rationale + schedule + logs + features)
+- [x] Week-aware generation (sees the other sessions) + per-lift last-performed + progression rules + repair loop  ·  full set-budget from `evidence.ts` still TODO
+- [x] WHOOP feature glossary (plain-English digest) in the prompt; `daysSince*` computed from logs
+- [x] Editable bodyweight via weigh-in (updates the live protein target)
 
-### P2 — Close the loop + real intelligence
-- [ ] Full logging fields: treadmill speed/distance/incline, bike resistance/distance, swim distance/laps, RPE, per-set, **pain/soreness note**; carry them all to the AI
-- [ ] Wire Trends e1RM (from `session_logs`) + add bodyweight trend; cut Harmony/volume; make recovery chart legible (dates); lazy-load recharts
-- [ ] Ground the coach (today's session + rationale + schedule + logs + features); give it one real action (regenerate)
-- [ ] **Week-level generation**: 3 genuinely complementary sessions using the (currently dead) evidence engine — `volumeBiasFor`, `gymSwimMix`, MEV/MAV/MRV, ≥2×/muscle, ≥48h lower-body
-- [ ] WHOOP feature glossary + explicit per-lift progression in the prompt; repair loop instead of silent fallback
-- [ ] Editable bodyweight (settings) — it's frozen at 78 kg with no UI path
+### P1 / P3 — Remaining (deferred; deliberately not rushed to protect the working deploy)
+- [ ] Surface hierarchy + one bespoke SVG recovery viz; header/branding consistency
+- [ ] Delete dead code/deps (old type family, `validatePlan`/`selectBranch`, `fueling.ts`, `export {}` stubs, `zustand`/`framer-motion`) — left in place to avoid Netlify deletion-propagation risk; needs a clean-deploy verification pass
+- [ ] PNG app icons + minimal app-shell service worker (true installability/offline)
+- [ ] Lazy-load recharts; `React.cache()` per-request reads; single-flight token refresh
+- [ ] Webhook persistence into `whoop_*`; read history from DB; fix `limit=25` pagination
+- [ ] Replace weekly-container schedule with a fixed 3-row table; full per-muscle weekly budget
+- [ ] Replace `window.confirm` with a HeroUI modal; coach one-tap "regenerate" action
 
-### P3 — Depth
-- [ ] Webhook persistence into the existing `whoop_*` tables; read history/trends from DB; fix `limit=25` pagination
-- [ ] Replace weekly-container schedule with a fixed 3-row table
-- [ ] `React.cache()` per-request reads; single-flight token refresh
-- [ ] a11y: `aria-live` chat (done), recovery never color-only (done via verdict), bigger touch targets, `inputMode` on number fields, replace `window.confirm` with a modal
+### P4 — Coach actions (next)
+- [ ] Let the coach actually *do* things (regenerate today / move a day) via a small intent layer

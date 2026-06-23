@@ -149,6 +149,23 @@ export async function loadLogForDate(admin: SupabaseClient, userId: string, date
   return (data?.sets as LoggedSession) ?? null;
 }
 
+// ── Bodyweight (dated weigh-ins → recomp trend + live protein target) ────────
+export async function addWeighIn(admin: SupabaseClient, userId: string, kg: number, date: string): Promise<void> {
+  await admin.from("bodyweight_log").upsert({ user_id: userId, logged_on: date, kg }, { onConflict: "user_id,logged_on" });
+  // Keep the profile's working bodyweight in sync so protein/calorie targets track.
+  await admin.from("profile").update({ bodyweight_kg: kg }).eq("user_id", userId);
+}
+
+export async function loadBodyweightSeries(admin: SupabaseClient, userId: string, n = 90): Promise<Array<{ date: string; kg: number }>> {
+  const { data } = await admin
+    .from("bodyweight_log")
+    .select("logged_on, kg")
+    .eq("user_id", userId)
+    .order("logged_on", { ascending: true })
+    .limit(n);
+  return (data ?? []).map((r) => ({ date: r.logged_on as string, kg: Number(r.kg) }));
+}
+
 export async function loadRecentLogs(admin: SupabaseClient, userId: string, n = 6): Promise<RecentLog[]> {
   const { data } = await admin
     .from("session_logs")

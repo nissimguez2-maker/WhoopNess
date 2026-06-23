@@ -160,12 +160,11 @@ export function detectRedFlags(input: {
 
 // ── Chat safety: screen a message for a contraindicated exercise request ─────
 const BANNED_KEYWORDS: Array<{ re: RegExp; tag: string; label: string; substituteId: string }> = [
-  { re: /\b(back\s*)?squat(s|ting)?\b|deep squat/i, tag: "deep_knee_flexion", label: "barbell back squat", substituteId: "leg_press_partial" },
-  { re: /\b(running|run|jog(ging)?)\b|treadmill/i, tag: "running", label: "running", substituteId: "stationary_bike" },
-  { re: /\b(box\s*jump|jump(ing|s)?|plyo(metric)?s?)\b/i, tag: "jumping_plyometric", label: "jumping / plyometrics", substituteId: "leg_press_partial" },
-  { re: /\bdead\s*lift(s|ing)?\b/i, tag: "heavy_axial_load", label: "heavy (conventional) deadlift", substituteId: "romanian_deadlift" },
-  { re: /\b(walking\s*)?lunge(s)?\b/i, tag: "deep_lunge", label: "lunges", substituteId: "leg_press_partial" },
-  { re: /\bleg\s*extension(s)?\b/i, tag: "loaded_full_rom_knee_extension", label: "loaded leg extension", substituteId: "seated_leg_curl" },
+  { re: /\b(back\s*)?squat(s|ting)?\b|deep squat/i, tag: "deep_knee_flexion", label: "deep squats", substituteId: "seated_leg_press" },
+  { re: /\b(running|run|jog(ging)?)\b/i, tag: "running", label: "running", substituteId: "exercise_bike" },
+  { re: /\b(box\s*jump|jump(ing|s)?|plyo(metric)?s?)\b/i, tag: "jumping_plyometric", label: "jumping / plyometrics", substituteId: "seated_leg_press" },
+  { re: /\bdead\s*lift(s|ing)?\b/i, tag: "heavy_axial_load", label: "heavy deadlift", substituteId: "seated_leg_curl" },
+  { re: /\b(walking\s*)?lunge(s)?\b/i, tag: "deep_lunge", label: "lunges", substituteId: "seated_leg_press" },
 ];
 
 export interface BannedExerciseScreen {

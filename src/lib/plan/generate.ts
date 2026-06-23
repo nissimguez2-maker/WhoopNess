@@ -1,189 +1,183 @@
-import type { MedicalProfile, SessionType, WeeklyPlan, WhoopFeatures, PlannedSession, SessionBranch, RecoveryBand } from "@/core/types";
-import { EXERCISES } from "@/core/exercises";
-import { filterAllowedExercises, validatePlan } from "@/core/guardrails";
-import { generateWeeklyPlan, defaultMix, type Slot } from "@/core/planner";
-import { gymSwimMix, volumeBiasFor, VOLUME_LANDMARKS, EVIDENCE_NOTES, TARGET_FREQUENCY_PER_WEEK } from "@/core/evidence";
+import type { DaySession, PrescribedExercise, RecoveryBand, SessionType, WhoopFeatures } from "@/core/types";
+import { EXERCISE_BY_ID, SWIM_COMPANION_IDS, WARMUP, COOLDOWN } from "@/core/exercises";
+import { buildDaySession } from "@/core/planner";
+import { proteinTargetG } from "@/core/protein";
+import { EVIDENCE_NOTES } from "@/core/evidence";
 import { llmComplete, llmConfigured } from "@/lib/llm";
 
-/**
- * The smart weekly plan engine. "LLM proposes, rules dispose":
- *   1) deterministic budget + gym/swim mix from WHOOP features (the brief),
- *   2) the LLM (OpenRouter, OPENROUTER_MODEL_PLAN) authors 3 complementary sessions
- *      within the guardrail-filtered allowed pool, citing the real WHOOP numbers,
- *   3) validatePlan gates it; on failure we re-prompt once, then fall back to the
- *      deterministic generator. The user can never receive an unsafe or off-type plan.
- */
-export async function generateSmartWeek(input: {
-  slots: Slot[];
-  medical: MedicalProfile;
-  weekStart: string;
-  features?: WhoopFeatures;
-}): Promise<WeeklyPlan> {
-  const { slots, medical, weekStart } = input;
-  const features = input.features ?? { fatigueState: "normal" as const };
-
-  const counts = gymSwimMix(features);
-  const mix = orderMix(counts.gym, counts.swim, slots.length);
-  const bias = volumeBiasFor(features);
-
-  // Deterministic baseline — always valid, used as the fallback.
-  const baseline = generateWeeklyPlan(slots, medical, weekStart, { mix });
-  const deterministicRationale = buildDeterministicRationale(features, counts, bias);
-
-  if (!llmConfigured()) {
-    return { ...baseline, rationale: deterministicRationale };
-  }
-
-  try {
-    const llm = await authorWithLlm({ slots, medical, weekStart, features, mix, bias });
-    if (llm) return llm;
-  } catch {
-    // fall through to deterministic
-  }
-  return { ...baseline, rationale: deterministicRationale };
+export interface RecentLog {
+  date: string;
+  type: SessionType;
+  exercises: Array<{ name: string; exerciseId?: string; weightKg?: number; reps?: number }>;
 }
 
-async function authorWithLlm(input: {
-  slots: Slot[];
-  medical: MedicalProfile;
-  weekStart: string;
-  features: WhoopFeatures;
-  mix: SessionType[];
-  bias: number;
-}): Promise<WeeklyPlan | null> {
-  const allowed = filterAllowedExercises(EXERCISES, input.medical);
-  const allowedSummary = allowed
-    .map((e) => `${e.id} (${e.name}; ${e.primaryMuscle}; ${e.equipment}${e.tags.includes("swim_eligible") ? "; swim_eligible" : ""})`)
-    .join("\n");
+export interface GenerateDayInput {
+  type: SessionType;
+  band: RecoveryBand;
+  recoveryScore?: number;
+  features?: WhoopFeatures;
+  recentLogs?: RecentLog[];
+  bodyweightKg?: number;
+  date: string;
+  fallbackWalk?: boolean;
+}
 
-  const budget = Object.entries(VOLUME_LANDMARKS)
-    .map(([m, l]) => `${m}: MEV ${l.mev} / target ~${Math.round(l.mav * input.bias)} / MRV ${l.mrv}`)
-    .join("; ");
+/** Allowed exercise ids for a session type (the only things the AI may propose). */
+function allowedIdsFor(type: SessionType, fallbackWalk?: boolean): string[] {
+  if (fallbackWalk) return ["city_walk"];
+  if (type === "swim") return [...SWIM_COMPANION_IDS, "swimming"];
+  // gym: everything except the pool + the standalone city walk
+  return Object.keys(EXERCISE_BY_ID).filter((id) => id !== "swimming" && id !== "city_walk");
+}
 
-  const system = `You are an expert strength & conditioning coach and physiotherapist programming a week of training. Voice: precise, calm, clinical.
+/**
+ * Generate the day's session. "LLM proposes, rules dispose":
+ * deterministic baseline → LLM refines within the approved list → validate → fallback.
+ */
+export async function generateDaySession(input: GenerateDayInput): Promise<DaySession> {
+  const recentIds = new Set<string>();
+  const lastLoads: Record<string, number> = {};
+  for (const log of input.recentLogs ?? []) {
+    for (const e of log.exercises) {
+      if (e.exerciseId) {
+        recentIds.add(e.exerciseId);
+        if (e.weightKg) lastLoads[e.exerciseId] ??= e.weightKg;
+      }
+    }
+  }
 
-HARD RULES (non-negotiable):
-- Use ONLY exercise ids from the ALLOWED list. Never invent ids or movements.
-- A session is exactly one TYPE: "gym" or "swim". A SWIM session may contain ONLY swim_eligible ids (swim_easy, push_up, pull_up, walking, stationary_bike). A GYM session must NOT contain swim_easy.
-- Respect the requested gym/swim mix and the per-muscle weekly volume budget; keep each gym session ~5 movements; train major muscles ≥${TARGET_FREQUENCY_PER_WEEK}×/week across the week.
-- Keep ≥48h between heavy lower-body gym sessions; distribute fatigue so the 3 sessions complement each other.
-- Each session needs exactly 3 branches: "green" (primary), "amber" (lighter), "red" (recovery/active).
-- Output STRICT JSON only, no prose, matching the schema. Cite the user's real WHOOP numbers in the rationales.`;
+  const baseline = buildDaySession(input.type, input.band, input.date, {
+    recoveryScore: input.recoveryScore,
+    recentIds,
+    lastLoads,
+    bodyweightKg: input.bodyweightKg,
+    fallbackWalk: input.fallbackWalk,
+  });
 
-  const user = `WEEK START: ${input.weekStart}
-SLOTS (day/time/assigned type): ${input.slots.map((s, i) => `${s.day} ${s.time ?? ""} → ${input.mix[i]}`).join(", ")}
+  if (input.fallbackWalk || !llmConfigured()) return baseline;
 
-WHOOP FEATURES: ${JSON.stringify(input.features)}
+  try {
+    const refined = await authorWithLlm(input, baseline);
+    if (refined) return refined;
+  } catch {
+    // fall through
+  }
+  return baseline;
+}
+
+async function authorWithLlm(input: GenerateDayInput, baseline: DaySession): Promise<DaySession | null> {
+  const allowed = allowedIdsFor(input.type, input.fallbackWalk);
+  const allowedSummary = allowed.map((id) => `${id} (${EXERCISE_BY_ID[id]!.name}; ${EXERCISE_BY_ID[id]!.category})`).join("\n");
+
+  const history = (input.recentLogs ?? [])
+    .slice(0, 6)
+    .map((l) => `${l.date} ${l.type}: ${l.exercises.map((e) => `${e.name}${e.weightKg ? ` ${e.weightKg}kg` : ""}${e.reps ? `×${e.reps}` : ""}`).join(", ")}`)
+    .join("\n") || "(no logged sessions yet)";
+
+  const system = `You are an expert S&C coach + physiotherapist building ONE training session for today. Calm, precise.
+
+HARD RULES:
+- Use ONLY exerciseId values from the ALLOWED list. Never invent movements.
+- ${input.type === "swim" ? "This is a SWIM session: include 1–2 companion exercises (push-ups/pull-ups/bike/walk) FIRST, then 'swimming' LAST (he's wet after)." : "This is a GYM session: ~5 exercises spread across push, pull, legs and core (knee/back-safe)."}
+- Tune volume/intensity to today's recovery. Progress loads sensibly from his recent logs (small steps; cap ~10%/week).
+- Vary from his last session so the week stays balanced across categories.
+- Output STRICT JSON only.`;
+
+  const user = `DATE: ${input.date}
+TYPE: ${input.type}
+RECOVERY: ${input.recoveryScore ?? "unknown"} (band ${input.band})
+WHOOP: ${JSON.stringify(input.features ?? {})}
+
+RECENT SESSIONS (most recent first):
+${history}
 
 EVIDENCE:
-${EVIDENCE_NOTES.map((n) => "- " + n).join("\n")}
+${EVIDENCE_NOTES.slice(0, 4).map((n) => "- " + n).join("\n")}
 
-PER-MUSCLE WEEKLY SET BUDGET (volume bias ${input.bias.toFixed(2)} of MAV): ${budget}
-
-ALLOWED EXERCISES:
+ALLOWED exerciseId list:
 ${allowedSummary}
 
-Return JSON exactly:
-{
-  "weeklyRationale": "2-3 sentences citing the WHOOP numbers and how the 3 sessions fit together",
-  "sessions": [
-    {
-      "day": "Sun", "type": "gym", "focus": "short label", "rationale": "1 sentence",
-      "branches": [
-        {"band":"green","exercises":[{"exerciseId":"id","sets":3,"reps":"8-10","loadKg":60,"restSec":120}]},
-        {"band":"amber","exercises":[{"exerciseId":"id","sets":2,"reps":"10-12"}]},
-        {"band":"red","exercises":[{"exerciseId":"stationary_bike","durationMin":20,"sets":1,"reps":"—"}]}
-      ]
-    }
-  ]
-}
-For swim/cardio movements use "durationMin" (and sets:1, reps:"—").`;
+Return JSON:
+{"rationale":"2-3 sentences citing his recovery + how this builds on recent sessions","exercises":[{"exerciseId":"id","sets":3,"reps":"8-12","loadKg":60}]}
+For cardio/swim use {"exerciseId":"id","durationMin":20} (omit sets/reps/load).`;
 
-  // Up to 2 attempts: author, validate, repair.
-  let lastViolations = "";
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const text = await llmComplete(
-      [
-        { role: "system", content: system },
-        { role: "user", content: attempt === 0 ? user : `${user}\n\nYour previous output had these violations — fix them:\n${lastViolations}` },
-      ],
-      { model: process.env.OPENROUTER_MODEL_PLAN, maxTokens: 2000, temperature: 0.4 },
-    );
-    const parsed = text && parsePlan(text, input.slots, input.mix, input.weekStart);
-    if (!parsed) continue;
-    const res = validatePlan(parsed, input.medical);
-    if (res.ok) return parsed;
-    lastViolations = res.violations.map((v) => `${v.sessionDay}/${v.band} ${v.exerciseId}: ${v.reason}`).join("\n");
-  }
-  return null;
+  const text = await llmComplete(
+    [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    { model: process.env.OPENROUTER_MODEL_PLAN, maxTokens: 1200, temperature: 0.5 },
+  );
+  if (!text) return null;
+
+  const parsed = parse(text);
+  if (!parsed) return null;
+
+  const exercises = mapAndValidate(parsed.exercises, input.type, new Set(allowed));
+  if (!exercises) return null;
+
+  const kind = input.type === "swim" ? "swim" : "gym";
+  return {
+    date: input.date,
+    type: input.type,
+    recoveryScore: input.recoveryScore,
+    band: input.band,
+    warmup: [...WARMUP[kind]],
+    exercises,
+    cooldown: [...COOLDOWN[kind]],
+    rationale: parsed.rationale || baseline.rationale,
+    proteinTargetG: proteinTargetG(input.bodyweightKg ?? 78),
+  };
 }
 
-const BANDS: RecoveryBand[] = ["green", "amber", "red"];
-
-function parsePlan(text: string, slots: Slot[], mix: SessionType[], weekStart: string): WeeklyPlan | null {
-  try {
-    const json = JSON.parse(stripFences(text)) as {
-      weeklyRationale?: string;
-      sessions?: Array<{ day?: string; type?: string; focus?: string; rationale?: string; branches?: Array<{ band?: string; exercises?: Array<Record<string, unknown>> }> }>;
-    };
-    if (!Array.isArray(json.sessions) || json.sessions.length === 0) return null;
-    const sessions: PlannedSession[] = json.sessions.map((s, i) => {
-      const type: SessionType = s.type === "swim" ? "swim" : "gym";
-      const branches: SessionBranch[] = BANDS.map((band) => {
-        const b = s.branches?.find((x) => x.band === band);
-        return {
-          band,
-          exercises: (b?.exercises ?? []).map((e) => ({
-            exerciseId: String(e.exerciseId ?? ""),
-            sets: Number(e.sets ?? 1),
-            reps: String(e.reps ?? "—"),
-            loadKg: e.loadKg != null ? Number(e.loadKg) : undefined,
-            rpe: e.rpe != null ? Number(e.rpe) : undefined,
-            restSec: e.restSec != null ? Number(e.restSec) : undefined,
-            durationMin: e.durationMin != null ? Number(e.durationMin) : undefined,
-          })),
-        };
-      });
-      return {
-        day: s.day || slots[i]?.day || "Day",
-        time: slots[i]?.time,
-        type,
-        focus: s.focus || (type === "swim" ? "Swim + upper" : "Full body"),
-        rationale: s.rationale,
-        branches,
-      };
+function mapAndValidate(
+  raw: Array<Record<string, unknown>>,
+  type: SessionType,
+  allowed: Set<string>,
+): PrescribedExercise[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const out: PrescribedExercise[] = [];
+  for (const r of raw) {
+    const id = String(r.exerciseId ?? "");
+    const ex = EXERCISE_BY_ID[id];
+    if (!ex || !allowed.has(id)) return null; // any off-list id → reject whole plan
+    const durationMin = r.durationMin != null ? Number(r.durationMin) : undefined;
+    out.push({
+      exerciseId: id,
+      name: ex.name,
+      category: ex.category,
+      sets: ex.isDuration ? 1 : Number(r.sets ?? 3),
+      reps: ex.isDuration ? "—" : String(r.reps ?? "10-12"),
+      loadKg: r.loadKg != null ? Number(r.loadKg) : undefined,
+      durationMin: ex.isDuration ? durationMin ?? 20 : undefined,
+      restSec: ex.defaultRestSec,
+      cues: ex.cues ?? [],
     });
-    return { weekStart, sessions, rationale: json.weeklyRationale };
+  }
+  // Swim invariant: swimming must be present and last.
+  if (type === "swim") {
+    const swimIdx = out.findIndex((e) => e.exerciseId === "swimming");
+    if (swimIdx === -1) return null;
+    if (swimIdx !== out.length - 1) {
+      const [swim] = out.splice(swimIdx, 1);
+      out.push(swim!);
+    }
+  } else {
+    if (out.some((e) => e.exerciseId === "swimming")) return null;
+  }
+  return out;
+}
+
+function parse(text: string): { rationale?: string; exercises: Array<Record<string, unknown>> } | null {
+  try {
+    const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const body = m ? m[1]! : text;
+    const s = body.indexOf("{");
+    const e = body.lastIndexOf("}");
+    const json = JSON.parse(s >= 0 ? body.slice(s, e + 1) : body);
+    if (!Array.isArray(json.exercises)) return null;
+    return json;
   } catch {
     return null;
   }
-}
-
-function stripFences(t: string): string {
-  const m = t.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const body = m ? m[1]! : t;
-  const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
-  return start >= 0 && end > start ? body.slice(start, end + 1) : body;
-}
-
-function orderMix(gym: number, swim: number, n: number): SessionType[] {
-  if (gym + swim !== n) return defaultMix(n);
-  // Interleave so a swim sits between gym days (recovery spacing).
-  if (gym === 2 && swim === 1) return ["gym", "swim", "gym"];
-  if (gym === 1 && swim === 2) return ["swim", "gym", "swim"];
-  const out: SessionType[] = [];
-  for (let i = 0; i < gym; i++) out.push("gym");
-  for (let i = 0; i < swim; i++) out.splice(i * 2 + 1, 0, "swim");
-  return out.slice(0, n);
-}
-
-function buildDeterministicRationale(features: WhoopFeatures, counts: { gym: number; swim: number }, bias: number): string {
-  const bits: string[] = [];
-  if (features.recovery7dMean != null) bits.push(`7-day recovery ~${features.recovery7dMean}%`);
-  if (features.recoverySlope != null) bits.push(features.recoverySlope >= 0 ? "trending up" : "trending down");
-  if (features.acwr != null) bits.push(`acute:chronic strain ${features.acwr}`);
-  const ctx = bits.length ? ` (${bits.join(", ")})` : "";
-  const lean = bias < 0.95 ? "leaning lighter to protect recovery" : bias > 1.05 ? "pushing volume while you're fresh" : "holding steady at your adaptive volume";
-  return `This week is ${counts.gym} gym + ${counts.swim} swim${ctx}, ${lean}. Swim sits between gym days to spare the knee, and volume targets each major muscle ${TARGET_FREQUENCY_PER_WEEK}×.`;
 }

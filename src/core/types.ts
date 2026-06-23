@@ -51,9 +51,14 @@ export type MuscleGroup =
 
 export type Equipment = "machine" | "cable" | "barbell" | "dumbbell" | "bodyweight" | "cardio";
 
+/** Movement category, used to spread a week evenly. */
+export type ExerciseCategory = "push" | "pull" | "legs" | "core" | "cardio";
+
 export interface Exercise {
   id: string;
   name: string;
+  /** Movement category for even weekly distribution. */
+  category: ExerciseCategory;
   /** Primary muscle group trained. */
   primaryMuscle: MuscleGroup;
   /** Secondary groups (counted at a fraction in volume). */
@@ -190,4 +195,51 @@ export interface WhoopFeatures {
   daysSinceSwim?: number;
   /** Coarse fatigue state derived from the above. */
   fatigueState: "fresh" | "normal" | "strained";
+}
+
+// ── Day-of generated session (the new model) ─────────────────────────────────
+/** One prescribed movement in a generated session. */
+export interface PrescribedExercise {
+  exerciseId: string;
+  name: string;
+  category: ExerciseCategory;
+  /** Strength: sets×reps. Cardio/swim: durationMin (sets=1). */
+  sets: number;
+  reps: string;
+  loadKg?: number;
+  restSec?: number;
+  durationMin?: number;
+  cues: string[];
+}
+
+/** A full session generated on the day from WHOOP + history. */
+export interface DaySession {
+  date: string; // YYYY-MM-DD
+  type: SessionType;
+  recoveryScore?: number;
+  band?: RecoveryBand;
+  warmup: string[];
+  exercises: PrescribedExercise[];
+  cooldown: string[];
+  rationale: string;
+  proteinTargetG: number;
+  /** True when this is the gym/pool-unavailable city-walk fallback. */
+  isFallbackWalk?: boolean;
+}
+
+/** What the user actually did (the checklist log → feeds the next generation). */
+export interface LoggedExercise {
+  exerciseId: string;
+  name: string;
+  done: boolean;
+  weightKg?: number;
+  reps?: number;
+  durationMin?: number;
+}
+
+export interface LoggedSession {
+  date: string;
+  type: SessionType;
+  exercises: LoggedExercise[];
+  note?: string;
 }

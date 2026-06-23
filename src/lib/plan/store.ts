@@ -1,99 +1,123 @@
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PlannedSession, SessionBranch, WeeklyPlan, WhoopFeatures } from "@/core/types";
-import { NISSIM_MEDICAL_PROFILE } from "@/core/exercises";
-import { type Slot } from "@/core/planner";
-import { generateSmartWeek } from "./generate";
+import type { DaySession, LoggedSession, SessionType } from "@/core/types";
+import { DEFAULT_SCHEDULE, type ScheduleSlot } from "@/core/schedule";
+import type { RecentLog } from "./generate";
 
-/** Default training slots until the user edits them (3×/week). */
-export const DEFAULT_SLOTS: Slot[] = [
-  { day: "Sun", minutes: 60, time: "21:00" },
-  { day: "Tue", minutes: 60, time: "07:00" },
-  { day: "Thu", minutes: 60, time: "21:00" },
-];
-
-const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-
-/** Most recent Saturday (the planning anchor), as YYYY-MM-DD. */
-export function currentWeekStart(d = new Date()): string {
+function weekStart(d = new Date()): string {
   const date = new Date(d);
-  const day = date.getDay(); // 0 = Sun … 6 = Sat
-  const back = (day + 1) % 7; // days since last Saturday
-  date.setDate(date.getDate() - back);
+  date.setDate(date.getDate() - ((date.getDay() + 1) % 7)); // back to Saturday
   return date.toISOString().slice(0, 10);
 }
 
-/** Load the latest persisted weekly plan for the owner, or null. */
-export async function loadWeeklyPlan(admin: SupabaseClient, userId: string): Promise<WeeklyPlan | null> {
-  const { data: planRow } = await admin
+/** A single container weekly_plans row holds the schedule slots (planned_sessions). */
+async function ensurePlanContainer(admin: SupabaseClient, userId: string): Promise<string> {
+  const { data } = await admin
     .from("weekly_plans")
-    .select("id, week_start, rationale")
+    .select("id")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!planRow) return null;
-
-  const { data: rows } = await admin
-    .from("planned_sessions")
-    .select("id, day, slot_time, session_type, focus, branches, rationale")
-    .eq("plan_id", planRow.id)
-    .order("slot_time", { ascending: true });
-
-  const sessions: PlannedSession[] = (rows ?? []).map((r) => ({
-    id: r.id as string,
-    day: r.day as string,
-    time: (r.slot_time as string) ?? undefined,
-    type: (r.session_type as "gym" | "swim") ?? "gym",
-    focus: (r.focus as string) ?? "",
-    rationale: (r.rationale as string) ?? undefined,
-    branches: (r.branches as SessionBranch[]) ?? [],
-  }));
-
-  return { weekStart: planRow.week_start as string, rationale: (planRow.rationale as string) ?? undefined, sessions };
-}
-
-/** Insert a generated plan + its sessions. */
-export async function persistWeeklyPlan(admin: SupabaseClient, userId: string, plan: WeeklyPlan): Promise<void> {
-  const { data: planRow, error } = await admin
+  if (data?.id) return data.id as string;
+  const { data: created, error } = await admin
     .from("weekly_plans")
-    .insert({ user_id: userId, week_start: plan.weekStart, rationale: plan.rationale ?? null })
+    .insert({ user_id: userId, week_start: weekStart() })
     .select("id")
     .single();
-  if (error || !planRow) throw error ?? new Error("failed to insert weekly_plan");
-
-  const sessionRows = plan.sessions.map((s) => ({
-    plan_id: planRow.id,
-    user_id: userId,
-    day: s.day,
-    slot_time: s.time ?? null,
-    session_type: s.type,
-    focus: s.focus,
-    branches: s.branches,
-    rationale: s.rationale ?? null,
-  }));
-  await admin.from("planned_sessions").insert(sessionRows);
+  if (error || !created) throw error ?? new Error("failed to create plan container");
+  return created.id as string;
 }
 
-/** Load the plan; if none, generate a smart one (WHOOP-grounded) and persist it. */
-export async function ensureWeeklyPlan(
+/** Load the weekly schedule (1 swim + 2 gym); create the default if none exists. */
+export async function ensureSchedule(admin: SupabaseClient, userId: string): Promise<ScheduleSlot[]> {
+  const existing = await loadSchedule(admin, userId);
+  if (existing.length > 0) return existing;
+  const planId = await ensurePlanContainer(admin, userId);
+  await admin.from("planned_sessions").insert(
+    DEFAULT_SCHEDULE.map((s) => ({
+      plan_id: planId,
+      user_id: userId,
+      day: s.day,
+      slot_time: s.time,
+      session_type: s.type,
+      focus: s.type === "swim" ? "Swim" : "Gym",
+      branches: [],
+    })),
+  );
+  return loadSchedule(admin, userId);
+}
+
+export async function loadSchedule(admin: SupabaseClient, userId: string): Promise<ScheduleSlot[]> {
+  const { data } = await admin
+    .from("planned_sessions")
+    .select("id, day, slot_time, session_type")
+    .eq("user_id", userId)
+    .order("slot_time", { ascending: true });
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    day: r.day as string,
+    time: (r.slot_time as string) ?? "18:00",
+    type: (r.session_type as SessionType) ?? "gym",
+  }));
+}
+
+export async function updateSlot(
   admin: SupabaseClient,
   userId: string,
-  features?: WhoopFeatures,
-): Promise<WeeklyPlan> {
-  const existing = await loadWeeklyPlan(admin, userId);
-  if (existing) return existing;
-  const plan = await generateSmartWeek({
-    slots: DEFAULT_SLOTS,
-    medical: NISSIM_MEDICAL_PROFILE,
-    weekStart: currentWeekStart(),
-    features,
-  });
-  await persistWeeklyPlan(admin, userId, plan);
-  return (await loadWeeklyPlan(admin, userId)) ?? plan;
+  id: string,
+  patch: { day: string; time: string; type: SessionType },
+): Promise<void> {
+  await admin
+    .from("planned_sessions")
+    .update({ day: patch.day, slot_time: patch.time, session_type: patch.type, focus: patch.type === "swim" ? "Swim" : "Gym" })
+    .eq("id", id)
+    .eq("user_id", userId);
 }
 
-/** Today's planned session (by weekday), or null if nothing is scheduled today. */
-export function getTodaySession(plan: WeeklyPlan, now = new Date()): PlannedSession | null {
-  const today = DOW[now.getDay()];
-  return plan.sessions.find((s) => s.day === today) ?? null;
+// ── Day-of generated session (stored in daily_cards.payload) ─────────────────
+export async function loadDaySession(admin: SupabaseClient, userId: string, date: string): Promise<DaySession | null> {
+  const { data } = await admin.from("daily_cards").select("payload").eq("user_id", userId).eq("card_date", date).maybeSingle();
+  return (data?.payload as DaySession) ?? null;
+}
+
+export async function saveDaySession(admin: SupabaseClient, userId: string, session: DaySession): Promise<void> {
+  await admin.from("daily_cards").upsert(
+    {
+      user_id: userId,
+      card_date: session.date,
+      band: session.band ?? null,
+      recovery_score: session.recoveryScore ?? null,
+      payload: session,
+    },
+    { onConflict: "user_id,card_date" },
+  );
+}
+
+// ── Logs (the checklist → history for the next generation) ───────────────────
+export async function saveLog(admin: SupabaseClient, userId: string, log: LoggedSession): Promise<void> {
+  await admin.from("session_logs").insert({
+    id: randomUUID(),
+    user_id: userId,
+    status: "done",
+    sets: log,
+    client_ts: new Date().toISOString(),
+  });
+}
+
+export async function loadRecentLogs(admin: SupabaseClient, userId: string, n = 6): Promise<RecentLog[]> {
+  const { data } = await admin
+    .from("session_logs")
+    .select("sets, logged_at")
+    .eq("user_id", userId)
+    .order("logged_at", { ascending: false })
+    .limit(n);
+  return (data ?? [])
+    .map((r) => r.sets as LoggedSession)
+    .filter((s) => s && Array.isArray(s.exercises))
+    .map((s) => ({
+      date: s.date,
+      type: s.type,
+      exercises: s.exercises.map((e) => ({ name: e.name, exerciseId: e.exerciseId, weightKg: e.weightKg, reps: e.reps })),
+    }));
 }

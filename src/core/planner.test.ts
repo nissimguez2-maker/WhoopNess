@@ -1,61 +1,46 @@
 import { describe, it, expect } from "vitest";
-import { generateWeeklyPlan, estimateDurationMin, type Slot } from "./planner";
-import { validatePlan } from "./guardrails";
-import { NISSIM_MEDICAL_PROFILE, EXERCISE_BY_ID } from "./exercises";
-import type { MuscleGroup } from "./types";
+import { buildDaySession, buildGymExercises, buildSwimExercises, estimateSessionMin } from "./planner";
+import { EXERCISE_BY_ID } from "./exercises";
 
-const SLOTS: Slot[] = [
-  { day: "Sun", minutes: 60, time: "21:00" },
-  { day: "Tue", minutes: 60, time: "07:00" },
-  { day: "Thu", minutes: 75, time: "21:00" },
-];
-
-describe("weekly planner", () => {
-  const plan = generateWeeklyPlan(SLOTS, NISSIM_MEDICAL_PROFILE, "2026-06-27");
-
-  it("creates one session per slot", () => {
-    expect(plan.sessions).toHaveLength(3);
-    expect(plan.sessions.map((s) => s.day)).toEqual(["Sun", "Tue", "Thu"]);
+describe("day-of gym session", () => {
+  const ex = buildGymExercises("green");
+  it("has ~5 exercises across multiple categories", () => {
+    expect(ex.length).toBeGreaterThanOrEqual(4);
+    const cats = new Set(ex.map((e) => e.category));
+    expect(cats.size).toBeGreaterThanOrEqual(3);
   });
-
-  it("gives every session green/amber/red branches", () => {
-    for (const s of plan.sessions) {
-      expect(s.branches.map((b) => b.band)).toEqual(["green", "amber", "red"]);
+  it("only uses approved, non-swim exercises", () => {
+    for (const e of ex) {
+      expect(EXERCISE_BY_ID[e.exerciseId], e.exerciseId).toBeDefined();
+      expect(e.exerciseId).not.toBe("swimming");
+      expect(e.exerciseId).not.toBe("city_walk");
     }
   });
+});
 
-  it("passes the guardrail validator (safe by construction)", () => {
-    const res = validatePlan(plan, NISSIM_MEDICAL_PROFILE);
-    expect(res.ok, JSON.stringify(res.violations)).toBe(true);
-  });
-
-  it("covers all major muscle groups across the week (balance)", () => {
-    const covered = new Set<MuscleGroup>();
-    for (const s of plan.sessions) {
-      for (const e of s.branches[0]!.exercises) {
-        const ex = EXERCISE_BY_ID[e.exerciseId]!;
-        covered.add(ex.primaryMuscle);
-        (ex.secondaryMuscles ?? []).forEach((m) => covered.add(m));
-      }
+describe("day-of swim session", () => {
+  const ex = buildSwimExercises("green");
+  it("ends with the swim, companions first", () => {
+    expect(ex[ex.length - 1]!.exerciseId).toBe("swimming");
+    const companionsBefore = ex.slice(0, -1).map((e) => e.exerciseId);
+    for (const id of companionsBefore) {
+      expect(["push_ups", "pull_ups", "exercise_bike", "treadmill_walk"]).toContain(id);
     }
-    for (const m of ["chest", "back", "shoulders", "quads", "hamstrings_glutes", "core"] as MuscleGroup[]) {
-      expect(covered.has(m), `missing ${m}`).toBe(true);
-    }
+    expect(companionsBefore.length).toBeGreaterThanOrEqual(1);
   });
+});
 
-  it("amber branch is lighter than green (fewer total sets)", () => {
-    for (const s of plan.sessions) {
-      const green = s.branches.find((b) => b.band === "green")!;
-      const amber = s.branches.find((b) => b.band === "amber")!;
-      const gSets = green.exercises.reduce((n, e) => n + e.sets, 0);
-      const aSets = amber.exercises.reduce((n, e) => n + e.sets, 0);
-      expect(aSets).toBeLessThan(gSets);
-    }
+describe("buildDaySession", () => {
+  it("gym session includes warm-up + cool-down + exercises", () => {
+    const s = buildDaySession("gym", "amber", "2026-06-23", { recoveryScore: 55 });
+    expect(s.warmup.length).toBeGreaterThan(0);
+    expect(s.cooldown.length).toBeGreaterThan(0);
+    expect(s.exercises.length).toBeGreaterThanOrEqual(4);
+    expect(estimateSessionMin(s)).toBeGreaterThanOrEqual(20);
   });
-
-  it("estimates a sane duration", () => {
-    const green = plan.sessions[0]!.branches[0]!;
-    expect(estimateDurationMin(green)).toBeGreaterThanOrEqual(20);
-    expect(estimateDurationMin(plan.sessions[0]!.branches[2]!)).toBe(20); // red = recovery
+  it("fallback walk is a single city walk", () => {
+    const s = buildDaySession("gym", "amber", "2026-06-23", { fallbackWalk: true });
+    expect(s.isFallbackWalk).toBe(true);
+    expect(s.exercises.map((e) => e.exerciseId)).toEqual(["city_walk"]);
   });
 });

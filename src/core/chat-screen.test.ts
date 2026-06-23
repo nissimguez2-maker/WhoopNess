@@ -20,7 +20,7 @@ describe("chat safety — contraindicated exercise screening", () => {
   it("flags heavy deadlifts (scoliosis/axial load)", () => {
     const r = screenMessageForBannedExercise("should I add deadlifts?", M);
     expect(r).not.toBeNull();
-    expect(r!.substituteName).toMatch(/romanian/i);
+    expect(r!.substituteName).toMatch(/curl/i);
   });
 
   it("does NOT flag allowed work", () => {

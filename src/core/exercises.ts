@@ -1,338 +1,344 @@
 import type { Exercise, MedicalProfile } from "./types";
 
 /**
- * Seed exercise library with guardrail tags + coaching detail.
+ * Exercise library — the EXACT set Nissim approved. The planner may propose nothing
+ * outside this list. Each carries 2–3 plain bullets on safe execution (knee/back-aware:
+ * post-MPFL left knee + patellofemoral cartilage defect, mild thoracic scoliosis).
  *
- * ⚠️ SAFETY-CRITICAL CONFIG. The tags below are what the guardrail engine uses to
- * keep contraindicated movements away from a post-MPFL knee with a patellofemoral
- * cartilage defect and a mild thoracic scoliosis. Treat changes like medical config:
- * version, test, and have the user (ideally a physio) approve.
- *
- * `swim_eligible` marks the only movements allowed inside a SWIM session
- * (swim itself + push-ups / pull-ups / walking / bike).
- *
- * The library intentionally INCLUDES contraindicated movements (e.g. back squat,
- * loaded leg extension, box jumps). They must never reach the user — they exist so
- * the L1 filter has something to strip and the L3 validator has something to catch.
+ * Categories drive even weekly distribution. `swimEligible` items may appear in a swim
+ * session — and only BEFORE the swim (you're wet after).
  */
 export const EXERCISES: Exercise[] = [
-  // ── Knee-safe lower body (fallback template core) ──
+  // ── PUSH ──────────────────────────────────────────────────────────────────
   {
-    id: "leg_press_partial",
-    name: "Leg press (partial ROM)",
-    primaryMuscle: "quads",
-    secondaryMuscles: ["hamstrings_glutes"],
-    tags: ["machine_supported", "low_impact", "knee_safe"],
-    equipment: "machine",
-    fallbackSafe: true,
-    instructions:
-      "Set the seat so your knees never pass ~90°. Press through mid-foot, stop short of lockout, lower under control to the limited depth.",
-    cues: ["Knees track toes", "Don't lock out", "Partial depth only"],
-    defaultRestSec: 120,
-  },
-  {
-    id: "hip_thrust",
-    name: "Barbell hip thrust",
-    primaryMuscle: "hamstrings_glutes",
-    tags: ["posterior_chain", "knee_safe", "low_impact"],
-    equipment: "barbell",
-    fallbackSafe: true,
-    instructions:
-      "Upper back on the bench, bar over hips (use a pad). Drive hips up by squeezing glutes until torso is parallel to the floor, then lower under control.",
-    cues: ["Squeeze glutes at top", "Ribs down", "Chin tucked"],
-    defaultRestSec: 120,
-  },
-  {
-    id: "seated_leg_curl",
-    name: "Seated leg curl",
-    primaryMuscle: "hamstrings_glutes",
-    tags: ["machine_supported", "knee_safe", "low_impact"],
-    equipment: "machine",
-    fallbackSafe: true,
-    instructions: "Curl the pad down by bending the knees, pause briefly, return slowly without letting the weight slam.",
-    cues: ["Controlled tempo", "Full but pain-free range"],
-    defaultRestSec: 75,
-  },
-  {
-    id: "romanian_deadlift",
-    name: "Romanian deadlift (hip hinge)",
-    primaryMuscle: "hamstrings_glutes",
-    secondaryMuscles: ["back"],
-    tags: ["posterior_chain", "knee_safe", "low_impact"],
-    equipment: "barbell",
-    fallbackSafe: true,
-    instructions:
-      "Soft knees, push hips back and slide the bar down your thighs until you feel a hamstring stretch, then drive hips forward to stand. Keep a neutral spine throughout.",
-    cues: ["Hinge at hips", "Neutral spine", "Bar stays close"],
-    defaultRestSec: 120,
-  },
-  {
-    id: "standing_calf_raise",
-    name: "Standing calf raise",
-    primaryMuscle: "calves",
-    tags: ["machine_supported", "knee_safe", "low_impact"],
-    equipment: "machine",
-    fallbackSafe: true,
-    instructions: "Rise onto the balls of your feet to full height, pause, then lower the heels below the platform for a stretch.",
-    cues: ["Full height", "Pause at top", "Slow stretch"],
-    defaultRestSec: 60,
-  },
-  // ── Upper body (knee-irrelevant, back-aware) ──
-  {
-    id: "chest_press_machine",
-    name: "Chest press machine",
+    id: "machine_chest_press",
+    name: "Machine Chest Press",
+    category: "push",
     primaryMuscle: "chest",
     secondaryMuscles: ["triceps", "shoulders"],
     tags: ["machine_supported", "low_impact"],
     equipment: "machine",
-    fallbackSafe: true,
-    instructions: "Set the seat so the handles are at mid-chest. Press out and slightly together, stop short of lockout, return under control.",
-    cues: ["Shoulder blades back", "Don't flare elbows", "Smooth tempo"],
     defaultRestSec: 90,
+    cues: [
+      "Set the seat so the handles sit at mid-chest; shoulder blades pulled back and down.",
+      "Press smoothly, stop just short of locking the elbows — don't let them flare past your wrists.",
+      "Keep your lower back lightly against the pad (no big arch).",
+    ],
   },
   {
-    id: "incline_db_press",
-    name: "Incline dumbbell press",
+    id: "flat_db_bench_press",
+    name: "Face-Up (Flat Bench) Dumbbell Press",
+    category: "push",
     primaryMuscle: "chest",
-    secondaryMuscles: ["shoulders", "triceps"],
+    secondaryMuscles: ["triceps", "shoulders"],
     tags: ["low_impact"],
     equipment: "dumbbell",
-    fallbackSafe: true,
-    instructions: "Bench at ~30°. Press the dumbbells up and together, lower to the upper chest with elbows ~45°.",
-    cues: ["Elbows at 45°", "Control the lowering"],
     defaultRestSec: 90,
+    cues: [
+      "Lie face-up, feet flat; press the dumbbells up and slightly together.",
+      "Lower with elbows at ~45° to your body until they're level with the bench — no deeper.",
+      "Ribs down, no big back arch; control the weight, don't bounce.",
+    ],
   },
   {
-    id: "chest_supported_row",
-    name: "Chest-supported row",
-    primaryMuscle: "back",
-    secondaryMuscles: ["biceps"],
-    tags: ["machine_supported", "low_impact", "posterior_chain"],
-    equipment: "machine",
-    fallbackSafe: true,
-    instructions: "Chest on the pad (protects the spine). Row the handles to your ribs by driving the elbows back, squeeze, then extend the arms fully.",
-    cues: ["Drive elbows back", "Squeeze shoulder blades", "Chest stays on pad"],
-    defaultRestSec: 90,
-  },
-  {
-    id: "lat_pulldown",
-    name: "Lat pulldown",
-    primaryMuscle: "back",
-    secondaryMuscles: ["biceps"],
-    tags: ["machine_supported", "low_impact"],
+    id: "standing_cable_chest_press",
+    name: "Standing Cable Chest Press",
+    category: "push",
+    primaryMuscle: "chest",
+    secondaryMuscles: ["triceps", "core"],
+    tags: ["low_impact", "core_stability"],
     equipment: "cable",
-    fallbackSafe: true,
-    instructions: "Pull the bar to your upper chest by leading with the elbows, control the return to a full stretch without shrugging.",
-    cues: ["Lead with elbows", "Chest up", "No swinging"],
-    defaultRestSec: 90,
+    defaultRestSec: 75,
+    cues: [
+      "Split stance, brace your core so your back stays neutral (no leaning back).",
+      "Press the handles forward and together; return under control.",
+      "Keep ribs down — the work is in the chest, not the lower back.",
+    ],
   },
   {
     id: "seated_shoulder_press",
-    name: "Seated shoulder press (supported)",
+    name: "Seated Shoulder Press",
+    category: "push",
     primaryMuscle: "shoulders",
     secondaryMuscles: ["triceps"],
     tags: ["machine_supported", "low_impact"],
     equipment: "machine",
-    fallbackSafe: true,
-    instructions: "Back supported. Press the handles overhead just short of lockout, lower to ear height under control.",
-    cues: ["Ribs down", "Don't lock out", "Smooth path"],
     defaultRestSec: 90,
+    cues: [
+      "Back supported against the pad; press just short of locking out.",
+      "Lower to about ear height — no need to go lower.",
+      "Keep ribs down and core gently braced to protect the lower back.",
+    ],
   },
   {
-    id: "cable_lateral_raise",
-    name: "Cable lateral raise",
-    primaryMuscle: "shoulders",
-    tags: ["low_impact"],
-    equipment: "cable",
-    fallbackSafe: true,
-    instructions: "Raise the arm out to the side to shoulder height with a soft elbow, lower slowly.",
-    cues: ["Lead with the elbow", "Slow negative"],
-    defaultRestSec: 60,
-  },
-  {
-    id: "cable_triceps_pushdown",
-    name: "Cable triceps pushdown",
-    primaryMuscle: "triceps",
-    tags: ["low_impact"],
-    equipment: "cable",
-    fallbackSafe: true,
-    instructions: "Elbows pinned to your sides, push the handle down to full extension, return slowly.",
-    cues: ["Elbows pinned", "Full extension"],
-    defaultRestSec: 60,
-  },
-  {
-    id: "incline_db_curl",
-    name: "Incline dumbbell curl",
-    primaryMuscle: "biceps",
-    tags: ["low_impact"],
-    equipment: "dumbbell",
-    fallbackSafe: true,
-    instructions: "Seated on an incline, arms hanging back. Curl without swinging, squeeze, lower slowly to a full stretch.",
-    cues: ["No swing", "Full stretch", "Slow negative"],
-    defaultRestSec: 60,
-  },
-  {
-    id: "face_pull",
-    name: "Cable face pull",
-    primaryMuscle: "shoulders",
-    secondaryMuscles: ["back"],
-    tags: ["low_impact", "posterior_chain", "core_stability"],
-    equipment: "cable",
-    fallbackSafe: true,
-    instructions: "Rope at face height. Pull toward your forehead, separating the rope and rotating the shoulders back; return under control.",
-    cues: ["Elbows high", "Squeeze rear delts", "Tall posture"],
-    defaultRestSec: 60,
-  },
-  {
-    id: "pallof_press",
-    name: "Pallof press (anti-rotation)",
-    primaryMuscle: "core",
-    tags: ["core_stability", "low_impact", "knee_safe"],
-    equipment: "cable",
-    fallbackSafe: true,
-    instructions: "Side-on to the cable. Press the handle straight out and resist the rotation, hold, return to your chest.",
-    cues: ["Brace core", "Resist the twist", "Hips square"],
-    defaultRestSec: 45,
-  },
-  {
-    id: "dead_bug",
-    name: "Dead bug",
-    primaryMuscle: "core",
-    tags: ["core_stability", "low_impact", "knee_safe"],
-    equipment: "bodyweight",
-    fallbackSafe: true,
-    instructions: "On your back, arms up, knees over hips. Lower an opposite arm and leg while pressing your low back into the floor; alternate.",
-    cues: ["Low back flat", "Slow + controlled", "Exhale on reach"],
-    defaultRestSec: 45,
-  },
-  // ── Swim-eligible movements (swim session pool) ──
-  {
-    id: "push_up",
-    name: "Push-up",
+    id: "push_ups",
+    name: "Push-ups",
+    category: "push",
     primaryMuscle: "chest",
     secondaryMuscles: ["triceps", "shoulders", "core"],
     tags: ["low_impact", "swim_eligible"],
     equipment: "bodyweight",
-    fallbackSafe: true,
-    instructions: "Hands under shoulders, body in one line. Lower the chest to just above the floor with elbows ~45°, press back up. Drop to knees if needed.",
-    cues: ["Body in one line", "Brace core", "Elbows 45°"],
     defaultRestSec: 75,
+    cues: [
+      "Hands under shoulders, body in one straight line — squeeze glutes and brace your core.",
+      "Lower with elbows ~45°; drop to your knees if your form or back starts to sag.",
+      "Don't let your hips pike up or your lower back dip.",
+    ],
+  },
+  // ── PULL ──────────────────────────────────────────────────────────────────
+  {
+    id: "lat_pulldown",
+    name: "Lat Pulldown",
+    category: "pull",
+    primaryMuscle: "back",
+    secondaryMuscles: ["biceps"],
+    tags: ["machine_supported", "low_impact"],
+    equipment: "cable",
+    defaultRestSec: 90,
+    cues: [
+      "Sit tall, thighs under the pad; pull the bar to your upper chest leading with the elbows.",
+      "Control the bar back up to a full stretch — no big lean-back or yanking.",
+      "Keep your chest up and avoid shrugging your shoulders to your ears.",
+    ],
   },
   {
-    id: "pull_up",
-    name: "Pull-up / assisted pull-up",
+    id: "pull_ups",
+    name: "Pull-ups (assisted as needed)",
+    category: "pull",
     primaryMuscle: "back",
     secondaryMuscles: ["biceps"],
     tags: ["low_impact", "swim_eligible"],
     equipment: "bodyweight",
-    fallbackSafe: true,
-    instructions: "Hang from the bar (use a band/machine assist as needed). Pull your chest toward the bar by driving the elbows down, lower under control to a full hang.",
-    cues: ["Drive elbows down", "Control the descent", "Avoid kipping"],
     defaultRestSec: 90,
+    cues: [
+      "Use a band or the assisted machine so you can control every rep.",
+      "Pull your chest toward the bar by driving elbows down; lower slowly to a full hang.",
+      "No kipping or jerking — smooth and controlled to protect shoulders and back.",
+    ],
   },
   {
-    id: "walking",
-    name: "Walk (brisk, flat)",
+    id: "prone_db_row",
+    name: "Face-Down (Flat Bench) Dumbbell Press",
+    category: "pull",
+    primaryMuscle: "back",
+    secondaryMuscles: ["shoulders", "biceps"],
+    tags: ["machine_supported", "low_impact", "posterior_chain"],
+    equipment: "dumbbell",
+    defaultRestSec: 90,
+    cues: [
+      "Lie face-down on a flat bench (chest supported) — this protects your lower back completely.",
+      "Row/press the dumbbells up by squeezing your shoulder blades together; lower slowly.",
+      "Keep your neck long and relaxed; let the bench take your bodyweight.",
+    ],
+  },
+  {
+    id: "cable_face_pull",
+    name: "Cable Face Pull",
+    category: "pull",
+    primaryMuscle: "shoulders",
+    secondaryMuscles: ["back"],
+    tags: ["low_impact", "posterior_chain", "core_stability"],
+    equipment: "cable",
+    defaultRestSec: 60,
+    cues: [
+      "Rope at face height; pull toward your forehead, splitting the rope and rotating shoulders back.",
+      "Stand tall and braced — don't lean back or arch.",
+      "Light weight, smooth tempo — this is for posture and shoulder health.",
+    ],
+  },
+  // ── LEGS (knee-safe) ────────────────────────────────────────────────────────
+  {
+    id: "seated_leg_press",
+    name: "Seated Leg Press",
+    category: "legs",
+    primaryMuscle: "quads",
+    secondaryMuscles: ["hamstrings_glutes"],
+    tags: ["machine_supported", "low_impact", "knee_safe"],
+    equipment: "machine",
+    defaultRestSec: 120,
+    cues: [
+      "Set the range so your knees never bend past ~90° — protect the kneecap, no deep bend.",
+      "Push through your mid-foot/heel; stop just short of locking the knees.",
+      "Move slowly and stop immediately if you feel anything sharp behind the kneecap.",
+    ],
+  },
+  {
+    id: "supported_step_ups",
+    name: "Supported Step-ups",
+    category: "legs",
+    primaryMuscle: "quads",
+    secondaryMuscles: ["hamstrings_glutes"],
+    tags: ["low_impact", "knee_safe"],
+    equipment: "bodyweight",
+    defaultRestSec: 90,
+    cues: [
+      "Use a LOW step and hold a rail/support — keep the front knee tracking over the toes.",
+      "Drive up through the heel of the standing leg; step down softly and controlled.",
+      "Keep the step low enough that the knee never passes ~90° — no deep or fast steps.",
+    ],
+  },
+  {
+    id: "seated_leg_extension",
+    name: "Seated Leg Extension",
+    category: "legs",
+    primaryMuscle: "quads",
+    tags: ["machine_supported", "knee_safe"],
+    equipment: "machine",
+    defaultRestSec: 75,
+    cues: [
+      "Go LIGHT and use only a pain-free partial range (often the top half) — protects the cartilage.",
+      "Squeeze at the top, lower slowly; never force a deep bend or push through pain.",
+      "Stop at once if you feel grinding or sharpness behind the kneecap.",
+    ],
+  },
+  {
+    id: "seated_leg_curl",
+    name: "Seated Leg Curl",
+    category: "legs",
+    primaryMuscle: "hamstrings_glutes",
+    tags: ["machine_supported", "low_impact", "knee_safe"],
+    equipment: "machine",
+    defaultRestSec: 75,
+    cues: [
+      "Pad just above the heels; curl down by bending the knees, pause briefly.",
+      "Return slowly under control — don't let the stack slam.",
+      "Keep hips down on the seat; smooth tempo, no jerking.",
+    ],
+  },
+  // ── CORE ──────────────────────────────────────────────────────────────────
+  {
+    id: "pallof_press",
+    name: "The Pallof Press",
+    category: "core",
+    primaryMuscle: "core",
+    tags: ["core_stability", "low_impact", "knee_safe"],
+    equipment: "cable",
+    defaultRestSec: 45,
+    cues: [
+      "Stand side-on to the cable, feet hip-width, core braced.",
+      "Press the handle straight out and RESIST the twist — hold, then bring it back in.",
+      "Keep hips and shoulders square; breathe steadily, don't hold your breath.",
+    ],
+  },
+  {
+    id: "cable_woodchop",
+    name: "Perpendicular Cable Woodchop (low to high)",
+    category: "core",
+    primaryMuscle: "core",
+    secondaryMuscles: ["shoulders"],
+    tags: ["core_stability", "low_impact"],
+    equipment: "cable",
+    defaultRestSec: 45,
+    cues: [
+      "Rotate from your ribcage and hips together — not by twisting your lower back.",
+      "Smooth, controlled arc from low to high; pivot the back foot to let the hips turn.",
+      "Moderate weight — control beats heavy here; keep it pain-free for the back.",
+    ],
+  },
+  // ── CARDIO / CONDITIONING ───────────────────────────────────────────────────
+  {
+    id: "exercise_bike",
+    name: "Exercise Bike",
+    category: "cardio",
     primaryMuscle: "quads",
     tags: ["low_impact", "knee_safe", "swim_eligible"],
     equipment: "cardio",
-    fallbackSafe: true,
     isDuration: true,
-    instructions: "Brisk flat walk at a conversational pace. Easy on the knee and good active recovery.",
-    cues: ["Flat ground", "Conversational pace"],
+    cues: [
+      "Set the seat high enough that your knee stays slightly bent at the bottom of the pedal.",
+      "Steady, easy-to-moderate effort you can hold a conversation through.",
+      "No heavy grinding resistance — keep the knees happy.",
+    ],
   },
-  // ── Knee-safe conditioning ──
   {
-    id: "stationary_bike",
-    name: "Stationary bike (Z2)",
+    id: "treadmill_walk",
+    name: "Treadmill — Fast Walk (no running)",
+    category: "cardio",
     primaryMuscle: "quads",
     tags: ["low_impact", "knee_safe", "swim_eligible"],
     equipment: "cardio",
-    fallbackSafe: true,
     isDuration: true,
-    instructions: "Set the seat so the knee stays slightly bent at the bottom. Ride at an easy, steady Zone-2 effort you can hold a conversation through.",
-    cues: ["Seat high enough", "Steady Z2 effort"],
+    cues: [
+      "Brisk WALK only — never run (running is off-limits for your knee).",
+      "Keep it flat or a very slight incline; long, relaxed stride.",
+      "Stop if you feel knee pain; walking should be comfortable.",
+    ],
   },
   {
-    id: "swim_easy",
-    name: "Swim",
+    id: "swimming",
+    name: "Swimming",
+    category: "cardio",
     primaryMuscle: "back",
     secondaryMuscles: ["shoulders", "chest", "core"],
-    tags: ["low_impact", "knee_safe", "swim_eligible"],
+    tags: ["low_impact", "knee_safe"],
     equipment: "cardio",
-    fallbackSafe: true,
     isDuration: true,
-    instructions: "Steady freestyle/breaststroke laps at an easy-to-moderate effort. Excellent low-impact full-body work — no brace needed in the water.",
-    cues: ["Relax + breathe", "Easy-moderate pace", "Mix strokes"],
-  },
-  // ── CONTRAINDICATED — present only so the engine can strip/catch them ──
-  {
-    id: "barbell_back_squat",
-    name: "Barbell back squat",
-    primaryMuscle: "quads",
-    tags: ["deep_knee_flexion", "heavy_axial_load"],
-    equipment: "barbell",
+    cues: [
+      "Easy-to-moderate laps — superb low-impact, full-body work with zero joint load.",
+      "Mix strokes if comfortable; no brace needed in the water.",
+      "Breathe relaxed and steady; stop a few laps short of fully gassed.",
+    ],
   },
   {
-    id: "loaded_leg_extension",
-    name: "Loaded leg extension (full ROM)",
+    id: "city_walk",
+    name: "City Walk (≥ 60 min)",
+    category: "cardio",
     primaryMuscle: "quads",
-    tags: ["loaded_full_rom_knee_extension"],
-    equipment: "machine",
-  },
-  {
-    id: "walking_lunge",
-    name: "Walking lunge",
-    primaryMuscle: "quads",
-    tags: ["deep_lunge", "deep_knee_flexion"],
-    equipment: "dumbbell",
-  },
-  {
-    id: "box_jump",
-    name: "Box jump",
-    primaryMuscle: "quads",
-    tags: ["jumping_plyometric", "high_impact"],
-    equipment: "bodyweight",
-  },
-  {
-    id: "treadmill_run",
-    name: "Treadmill run",
-    primaryMuscle: "quads",
-    tags: ["running", "high_impact"],
+    tags: ["low_impact", "knee_safe"],
     equipment: "cardio",
-  },
-  {
-    id: "conventional_deadlift",
-    name: "Conventional deadlift (heavy)",
-    primaryMuscle: "hamstrings_glutes",
-    secondaryMuscles: ["back"],
-    tags: ["heavy_axial_load", "posterior_chain"],
-    equipment: "barbell",
+    isDuration: true,
+    cues: [
+      "When the gym/pool isn't possible: a brisk hour-plus walk around the city.",
+      "Comfortable shoes, flat-ish route; keep a steady conversational pace.",
+      "Easy on the knee and great for recovery and step count.",
+    ],
   },
 ];
 
-export const EXERCISE_BY_ID: Record<string, Exercise> = Object.fromEntries(
-  EXERCISES.map((e) => [e.id, e]),
-);
+export const EXERCISE_BY_ID: Record<string, Exercise> = Object.fromEntries(EXERCISES.map((e) => [e.id, e]));
+
+/** Items allowed in a swim session — done BEFORE the swim (you're wet after). */
+export const SWIM_COMPANION_IDS = ["push_ups", "pull_ups", "treadmill_walk", "exercise_bike"];
+
+/** Standard warm-up / cool-down bullets bookending every physical session. */
+export const WARMUP = {
+  gym: [
+    "5 min easy bike or brisk treadmill walk to warm up.",
+    "Knee & hip: 8–10 slow sit-to-stands to a high seat (pain-free range) + gentle leg swings.",
+    "Shoulders & back: band pull-aparts + 6–8 cat-cow reps for a neutral spine.",
+  ],
+  swim: [
+    "On land first: 3–4 min brisk walk + arm circles and band pull-aparts.",
+    "Gentle hip and knee mobility so you enter the water loose.",
+    "Ease into the first lap or two before picking up the pace.",
+  ],
+} as const;
+
+export const COOLDOWN = {
+  gym: [
+    "3–5 min very easy bike or walk to bring the heart rate down.",
+    "Gentle stretch: quads, hamstrings, chest, lats — 20–30s each, no bouncing.",
+    "Note how the knees and back feel (use this when you log).",
+  ],
+  swim: [
+    "2–3 very easy laps to flush out, then get out.",
+    "Light shoulder and chest stretch on the deck.",
+    "Note how the body feels (use this when you log).",
+  ],
+} as const;
 
 /**
- * Nissim's medical profile → hard constraints + advisories.
- * Left knee: post-MPFL + patellofemoral cartilage defect + instability.
- * Right knee: minor. Back: 8° thoracic scoliosis + back pain.
+ * Nissim's medical profile. The curated library above is the primary safety boundary;
+ * these hard tags still block clearly contraindicated patterns (kept for chat screening).
+ * Note: seated leg extension is included per Nissim's explicit request, with light/partial
+ * pain-free guidance, so the full-ROM-extension block is intentionally not applied here.
  */
 export const NISSIM_MEDICAL_PROFILE: MedicalProfile = {
   hard: [
     {
       id: "knee_patellofemoral",
       label: "Left knee: post-MPFL surgery + patellofemoral cartilage defect + instability",
-      blockedTags: [
-        "deep_knee_flexion",
-        "loaded_full_rom_knee_extension",
-        "deep_lunge",
-        "jumping_plyometric",
-        "high_impact",
-        "running",
-      ],
+      blockedTags: ["deep_knee_flexion", "deep_lunge", "jumping_plyometric", "high_impact", "running"],
     },
     {
       id: "spine_scoliosis",
@@ -342,8 +348,7 @@ export const NISSIM_MEDICAL_PROFILE: MedicalProfile = {
   ],
   advisories: [
     "Wear knee braces (both knees) for all training except swimming.",
-    "Favor symmetric / machine-supported loading; build heavy axial load gradually.",
-    "Hydrate well (uric-acid history); favor lipid-friendly kosher choices.",
+    "Favor symmetric / supported loading; keep everything pain-free.",
     "Stop and reassess on any knee pain, swelling, or instability.",
   ],
   maxWeeklyLoadProgression: 0.1,

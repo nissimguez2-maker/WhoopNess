@@ -1,50 +1,43 @@
 import Link from "next/link";
 import { Chip } from "@heroui/react";
 import { Link2, CheckCircle2 } from "lucide-react";
-import { DailyCard } from "@/components/DailyCard";
+import { TodayClient } from "@/components/TodayClient";
 import { KeystoneStatus } from "@/components/KeystoneStatus";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Wordmark } from "@/components/ui/Wordmark";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getOwnerId } from "@/lib/owner";
 import { ensureUserBootstrap } from "@/lib/bootstrap";
-import { isWhoopConnected, getOwnerRecovery, getOwnerWhoopFeatures } from "@/lib/whoop/sync";
-import { ensureWeeklyPlan, getTodaySession } from "@/lib/plan/store";
-import { buildTodayCardState, type CardState, type OwnerProfile } from "@/lib/today";
-import type { TaperStage } from "@/core/fueling";
+import { isWhoopConnected, getOwnerRecovery } from "@/lib/whoop/sync";
+import { ensureSchedule, loadDaySession } from "@/lib/plan/store";
+import { bandFor } from "@/lib/today";
+import { todaySlot } from "@/core/schedule";
+import type { DaySession, RecoveryBand, SessionType } from "@/core/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function TodayPage({ searchParams }: { searchParams: Promise<{ whoop?: string }> }) {
-  const sp = await searchParams;
+export default async function Home() {
   const today = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
-  let state: CardState = { kind: "no-connection" };
   let whoopConnected = false;
+  let slotType: SessionType | null = null;
+  let initialSession: DaySession | null = null;
+  let recoveryScore: number | undefined;
+  let band: RecoveryBand | null = null;
 
   try {
     const admin = getSupabaseAdmin();
     const ownerId = getOwnerId();
     await ensureUserBootstrap(admin, ownerId);
-
     whoopConnected = await isWhoopConnected(ownerId);
-    const [recovery, features, profileRow] = await Promise.all([
-      getOwnerRecovery(ownerId),
-      whoopConnected ? getOwnerWhoopFeatures(ownerId) : Promise.resolve(undefined),
-      admin.from("profile").select("bodyweight_kg, glp1_stage").eq("user_id", ownerId).maybeSingle(),
-    ]);
 
-    const plan = await ensureWeeklyPlan(admin, ownerId, features);
-    const session = getTodaySession(plan);
-
-    const profile: OwnerProfile = {
-      bodyweightKg: Number(profileRow.data?.bodyweight_kg ?? 78),
-      taper: (profileRow.data?.glp1_stage as TaperStage) ?? "tapering",
-    };
-
-    state = buildTodayCardState({ whoopConnected, recovery, session, profile });
+    const [schedule, recovery] = await Promise.all([ensureSchedule(admin, ownerId), getOwnerRecovery(ownerId)]);
+    slotType = todaySlot(schedule)?.type ?? null;
+    recoveryScore = recovery?.recoveryScore;
+    band = bandFor(recovery);
+    initialSession = await loadDaySession(admin, ownerId, new Date().toISOString().slice(0, 10));
   } catch {
-    state = { kind: "no-connection" };
+    whoopConnected = false;
   }
 
   return (
@@ -65,17 +58,18 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         }
       />
 
-      {sp.whoop === "connected" && (
-        <div className="rounded-xl bg-success-50 px-3 py-2 text-sm text-success-400">WHOOP connected — your data will sync shortly.</div>
-      )}
-      {sp.whoop === "error" && (
-        <div className="rounded-xl bg-danger-50 px-3 py-2 text-sm text-danger-400">Couldn&apos;t connect WHOOP. Try again.</div>
-      )}
+      {whoopConnected && <KeystoneStatus wornLastNight={recoveryScore != null} />}
 
-      {whoopConnected && <KeystoneStatus wornLastNight={state.kind === "ready"} />}
-      <DailyCard state={state} />
+      <TodayClient
+        whoopConnected={whoopConnected}
+        slotType={slotType}
+        initialSession={initialSession}
+        recoveryScore={recoveryScore}
+        band={band}
+      />
+
       <Link href="/week" className="text-center text-xs text-foreground-500">
-        The week is the plan — view &amp; edit your sessions →
+        Your week: 1 swim + 2 gym — tap to set days &amp; times →
       </Link>
     </div>
   );

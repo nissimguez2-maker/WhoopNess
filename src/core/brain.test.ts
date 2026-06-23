@@ -1,17 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { computeWhoopFeatures } from "../lib/whoop/features";
-import { gymSwimMix, volumeBiasFor } from "./evidence";
-import { generateWeeklyPlan, buildSessionBranches, defaultMix, type Slot } from "./planner";
-import { validatePlan } from "./guardrails";
-import { NISSIM_MEDICAL_PROFILE } from "./exercises";
-import type { WeeklyPlan } from "./types";
+import { buildSwimExercises } from "./planner";
+import { filterAllowedExercises, screenMessageForBannedExercise } from "./guardrails";
+import { EXERCISES, NISSIM_MEDICAL_PROFILE } from "./exercises";
 
 const M = NISSIM_MEDICAL_PROFILE;
-const SLOTS: Slot[] = [
-  { day: "Sun", minutes: 60, time: "21:00" },
-  { day: "Tue", minutes: 60, time: "07:00" },
-  { day: "Thu", minutes: 60, time: "21:00" },
-];
 
 describe("WHOOP features", () => {
   it("reads a well-recovered, improving week as 'fresh'", () => {
@@ -21,7 +14,6 @@ describe("WHOOP features", () => {
     expect(f.recoverySlope!).toBeGreaterThan(0);
     expect(f.fatigueState).toBe("fresh");
   });
-
   it("reads a low, declining week as 'strained'", () => {
     const recovery = [30, 35, 33, 40, 38, 42, 45].map((s, i) => ({ date: `d${i}`, recoveryScore: s, hrvMs: 30, restingHr: 60 }));
     const f = computeWhoopFeatures({ recovery, strain: [], sleep: [] });
@@ -29,70 +21,34 @@ describe("WHOOP features", () => {
   });
 });
 
-describe("autoregulation mix + bias", () => {
-  it("strained weeks get more swim, fresh weeks favor gym", () => {
-    expect(gymSwimMix({ fatigueState: "strained" })).toEqual({ gym: 1, swim: 2 });
-    expect(gymSwimMix({ fatigueState: "fresh" })).toEqual({ gym: 2, swim: 1 });
+describe("approved library is safe by construction", () => {
+  it("nothing in the library is contraindicated", () => {
+    const allowed = filterAllowedExercises(EXERCISES, M);
+    expect(allowed.length).toBe(EXERCISES.length); // curated list — all pass
   });
-  it("volume bias drops when strained, rises when fresh", () => {
-    expect(volumeBiasFor({ fatigueState: "strained" })).toBeLessThan(1);
-    expect(volumeBiasFor({ fatigueState: "fresh" })).toBeGreaterThan(1);
+  it("every exercise has a category and at least 2 safety cues", () => {
+    for (const e of EXERCISES) {
+      expect(e.category, e.id).toBeTruthy();
+      expect((e.cues ?? []).length, e.id).toBeGreaterThanOrEqual(2);
+    }
   });
-});
-
-describe("typed weekly plan (gym | swim)", () => {
-  const plan = generateWeeklyPlan(SLOTS, M, "2026-06-27", { mix: ["gym", "swim", "gym"] });
-
-  it("assigns the requested types", () => {
-    expect(plan.sessions.map((s) => s.type)).toEqual(["gym", "swim", "gym"]);
-  });
-  it("passes the guardrail validator incl. the swim/gym invariant", () => {
-    const res = validatePlan(plan, M);
-    expect(res.ok, JSON.stringify(res.violations)).toBe(true);
-  });
-  it("default mix puts a swim between gym days", () => {
-    expect(defaultMix(3)).toEqual(["gym", "swim", "gym"]);
+  it("swim companions are all swim-eligible and exclude the swim itself", () => {
+    const swim = buildSwimExercises("amber");
+    const companions = swim.slice(0, -1);
+    for (const c of companions) expect(["push_ups", "pull_ups", "exercise_bike", "treadmill_walk"]).toContain(c.exerciseId);
   });
 });
 
-describe("swim/gym invariant in validatePlan", () => {
-  it("rejects a gym machine inside a swim session", () => {
-    const bad: WeeklyPlan = {
-      weekStart: "2026-06-27",
-      sessions: [
-        {
-          day: "Tue",
-          type: "swim",
-          focus: "Swim",
-          branches: [{ band: "green", exercises: [{ exerciseId: "leg_press_partial", sets: 3, reps: "8-10" }] }],
-        },
-      ],
-    };
-    const res = validatePlan(bad, M);
-    expect(res.ok).toBe(false);
-    expect(res.violations.some((v) => v.constraintId === "swim_invariant")).toBe(true);
+describe("chat safety screening (new ids)", () => {
+  it("flags running → exercise bike", () => {
+    const r = screenMessageForBannedExercise("can I go for a run?", M);
+    expect(r?.substituteName).toMatch(/bike/i);
   });
-
-  it("rejects a swim inside a gym session", () => {
-    const bad: WeeklyPlan = {
-      weekStart: "2026-06-27",
-      sessions: [
-        {
-          day: "Sun",
-          type: "gym",
-          focus: "Gym",
-          branches: [{ band: "green", exercises: [{ exerciseId: "swim_easy", sets: 1, reps: "—", durationMin: 20 }] }],
-        },
-      ],
-    };
-    const res = validatePlan(bad, M);
-    expect(res.ok).toBe(false);
-    expect(res.violations.some((v) => v.constraintId === "gym_invariant")).toBe(true);
+  it("flags deep squats → seated leg press", () => {
+    const r = screenMessageForBannedExercise("should I do deep squats?", M);
+    expect(r?.substituteName).toMatch(/leg press/i);
   });
-
-  it("buildSessionBranches('swim') yields a valid swim session", () => {
-    const branches = buildSessionBranches("swim", [], M);
-    const plan: WeeklyPlan = { weekStart: "2026-06-27", sessions: [{ day: "Tue", type: "swim", focus: "Swim", branches }] };
-    expect(validatePlan(plan, M).ok).toBe(true);
+  it("does not flag approved work", () => {
+    expect(screenMessageForBannedExercise("how many lat pulldowns?", M)).toBeNull();
   });
 });

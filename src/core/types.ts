@@ -225,6 +225,14 @@ export interface DaySession {
   proteinTargetG: number;
   /** True when this is the gym/pool-unavailable city-walk fallback. */
   isFallbackWalk?: boolean;
+  /** Whether the AI authored this session or it's the deterministic baseline. */
+  source?: "llm" | "baseline";
+}
+
+/** One actual set the user performed. */
+export interface LoggedSet {
+  weightKg?: number;
+  reps?: number;
 }
 
 /** What the user actually did (the checklist log → feeds the next generation). */
@@ -232,14 +240,29 @@ export interface LoggedExercise {
   exerciseId: string;
   name: string;
   done: boolean;
+  /** Strength: top-set summary (kept for quick history) + per-set detail. */
   weightKg?: number;
   reps?: number;
+  sets?: LoggedSet[];
+  /** Effort, 6–10 (Borg-ish RPE). */
+  rpe?: number;
+  /** Cardio/conditioning, captured by movement. */
   durationMin?: number;
+  speedKmh?: number; // treadmill
+  inclinePct?: number; // treadmill
+  distanceKm?: number; // treadmill / bike / walk
+  resistanceLevel?: number; // bike
+  distanceM?: number; // swim
 }
+
+/** 0 = none … 3 = sharp. The most important subjective signal for a rehab case. */
+export type PainLevel = 0 | 1 | 2 | 3;
 
 export interface LoggedSession {
   date: string;
   type: SessionType;
   exercises: LoggedExercise[];
   note?: string;
+  kneePain?: PainLevel;
+  backPain?: PainLevel;
 }

@@ -111,14 +111,42 @@ export async function saveDaySession(admin: SupabaseClient, userId: string, sess
 }
 
 // ── Logs (the checklist → history for the next generation) ───────────────────
+/** Idempotent per (user, date, type): re-logging a day overwrites instead of duplicating. */
 export async function saveLog(admin: SupabaseClient, userId: string, log: LoggedSession): Promise<void> {
-  await admin.from("session_logs").insert({
-    id: randomUUID(),
-    user_id: userId,
-    status: "done",
-    sets: log,
-    client_ts: new Date().toISOString(),
-  });
+  const { data: existing } = await admin
+    .from("session_logs")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("sets->>date", log.date)
+    .eq("sets->>type", log.type)
+    .order("logged_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) {
+    await admin.from("session_logs").update({ sets: log, client_ts: new Date().toISOString() }).eq("id", existing.id as string);
+  } else {
+    await admin.from("session_logs").insert({
+      id: randomUUID(),
+      user_id: userId,
+      status: "done",
+      sets: log,
+      client_ts: new Date().toISOString(),
+    });
+  }
+}
+
+/** Today's saved log (so the checklist can rehydrate instead of re-arming). */
+export async function loadLogForDate(admin: SupabaseClient, userId: string, date: string, type: SessionType): Promise<LoggedSession | null> {
+  const { data } = await admin
+    .from("session_logs")
+    .select("sets")
+    .eq("user_id", userId)
+    .eq("sets->>date", date)
+    .eq("sets->>type", type)
+    .order("logged_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data?.sets as LoggedSession) ?? null;
 }
 
 export async function loadRecentLogs(admin: SupabaseClient, userId: string, n = 6): Promise<RecentLog[]> {
@@ -134,6 +162,22 @@ export async function loadRecentLogs(admin: SupabaseClient, userId: string, n = 
     .map((s) => ({
       date: s.date,
       type: s.type,
-      exercises: s.exercises.map((e) => ({ name: e.name, exerciseId: e.exerciseId, weightKg: e.weightKg, reps: e.reps })),
+      note: s.note,
+      kneePain: s.kneePain,
+      backPain: s.backPain,
+      exercises: s.exercises.map((e) => ({
+        name: e.name,
+        exerciseId: e.exerciseId,
+        done: e.done,
+        weightKg: e.weightKg,
+        reps: e.reps,
+        rpe: e.rpe,
+        durationMin: e.durationMin,
+        speedKmh: e.speedKmh,
+        inclinePct: e.inclinePct,
+        distanceKm: e.distanceKm,
+        resistanceLevel: e.resistanceLevel,
+        distanceM: e.distanceM,
+      })),
     }));
 }

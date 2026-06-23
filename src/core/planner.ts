@@ -126,6 +126,7 @@ export function buildDaySession(type: SessionType, band: RecoveryBand, date: str
       `${opts.fallbackWalk ? "Gym and pool are out today, so a brisk hour-long walk keeps things moving and stays easy on the knee." : isSwim ? "Swim day. A little strength on land first, then easy laps." : "A full gym day across push, pull, legs and core, sized to how you're recovering."}`,
     proteinTargetG: proteinTargetG(opts.bodyweightKg ?? 78),
     isFallbackWalk: opts.fallbackWalk,
+    source: "baseline",
   };
 }
 

@@ -3,7 +3,52 @@
 import { coachReply, type CoachReply, type CoachTurn } from "@/lib/claude/chat";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getOwnerId } from "@/lib/owner";
-import { getOwnerRecovery } from "@/lib/whoop/sync";
+import { getOwnerRecovery, getOwnerWhoopFeatures } from "@/lib/whoop/sync";
+import { ensureSchedule, loadDaySession, loadRecentLogs } from "@/lib/plan/store";
+import { proteinTargetG } from "@/core/protein";
+import { todaySlot } from "@/core/schedule";
+import { todayKey, todayWeekday } from "@/lib/date";
+import { DEFAULT_BODYWEIGHT } from "@/lib/today";
+
+/** Build the coach's live context from the app's own state (not just a recovery %). */
+async function buildContext(): Promise<string> {
+  const admin = getSupabaseAdmin();
+  const ownerId = getOwnerId();
+  const date = todayKey();
+
+  const [recovery, features, schedule, session, logs, profRes] = await Promise.all([
+    getOwnerRecovery(ownerId),
+    getOwnerWhoopFeatures(ownerId),
+    ensureSchedule(admin, ownerId),
+    loadDaySession(admin, ownerId, date),
+    loadRecentLogs(admin, ownerId, 3),
+    admin.from("profile").select("bodyweight_kg").eq("user_id", ownerId).maybeSingle(),
+  ]);
+
+  const slot = todaySlot(schedule, todayWeekday());
+  const bw = Number(profRes.data?.bodyweight_kg ?? DEFAULT_BODYWEIGHT);
+
+  const lines: string[] = [];
+  lines.push(`Today (${date}) is a ${slot?.type ?? "rest"} day.`);
+  if (recovery?.recoveryScore != null) lines.push(`Recovery ${recovery.recoveryScore}%${features?.fatigueState ? `, overall ${features.fatigueState}` : ""}.`);
+  lines.push(`This week: ${schedule.map((s) => `${s.day} ${s.type}`).join(", ") || "not set"}.`);
+  if (session) {
+    const ex = session.exercises
+      .map((e) => `${e.name} ${e.durationMin != null ? `${e.durationMin}min` : `${e.sets}×${e.reps}${e.loadKg != null ? ` @${e.loadKg}kg` : ""}`}`)
+      .join("; ");
+    lines.push(`Today's planned session: ${ex}. Why: ${session.rationale}`);
+  } else {
+    lines.push(`Today's session hasn't been generated yet.`);
+  }
+  if (logs.length) {
+    lines.push(
+      "Recent: " +
+        logs.map((l) => `${l.date} ${l.type} (${l.exercises.filter((e) => e.done !== false).map((e) => e.name).slice(0, 5).join(", ")})`).join(" | "),
+    );
+  }
+  lines.push(`Bodyweight ${bw}kg, protein target ~${proteinTargetG(bw)}g/day. Goal: maintenance recomposition; low-impact; knee/back guardrails.`);
+  return lines.join("\n");
+}
 
 /** Send a message: persist it, build live context, reply, persist the reply. */
 export async function askCoach(message: string): Promise<CoachReply> {
@@ -23,26 +68,28 @@ export async function askCoach(message: string): Promise<CoachReply> {
       .order("created_at", { ascending: false })
       .limit(11);
     const chronological = (data ?? []).reverse();
-    // Drop the trailing current message — coachReply appends it itself.
     const history: CoachTurn[] = chronological.slice(0, -1).map((m) => ({
       role: m.role === "coach" ? "coach" : "user",
       content: m.content as string,
     }));
 
-    const recovery = await getOwnerRecovery(ownerId);
-    const context = recovery
-      ? `Today's recovery is ${recovery.recoveryScore}%. Goal: maintenance recomposition; trains 3×/week (gym + swim), low-impact, knee/back guardrails.`
-      : undefined;
+    let context: string | undefined;
+    try {
+      context = await buildContext();
+    } catch {
+      context = undefined;
+    }
 
     const reply = await coachReply(history, clean, context);
-    await admin.from("chat_messages").insert({ user_id: ownerId, role: "coach", content: reply.text });
+    // Persist the reply outside the LLM path so a write error never re-bills the model.
+    try {
+      await admin.from("chat_messages").insert({ user_id: ownerId, role: "coach", content: reply.text });
+    } catch {
+      /* best-effort */
+    }
     return reply;
   } catch {
-    try {
-      return await coachReply([], clean);
-    } catch {
-      return { source: "offline", text: "Couldn't reach me just now. Give it a second and try again." };
-    }
+    return { source: "offline", text: "Couldn't reach me just now. Give it a second and try again." };
   }
 }
 

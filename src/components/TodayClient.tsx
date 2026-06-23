@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { CardBody, Button } from "@heroui/react";
 import { Dumbbell, Waves, Footprints, Link2, MoonStar } from "lucide-react";
-import type { DaySession, RecoveryBand, SessionType } from "@/core/types";
+import type { DaySession, LoggedSession, RecoveryBand, SessionType } from "@/core/types";
 import { VERDICT } from "@/core/recovery";
 import { SurfaceCard } from "./ui/SurfaceCard";
 import { RecoveryRing } from "./RecoveryRing";
@@ -39,14 +39,19 @@ export function TodayClient({
   initialSession,
   recoveryScore,
   band,
+  existingLog = null,
+  lastByExercise = {},
 }: {
   whoopConnected: boolean;
   slotType: SessionType | null;
   initialSession: DaySession | null;
   recoveryScore?: number;
   band?: RecoveryBand | null;
+  existingLog?: LoggedSession | null;
+  lastByExercise?: Record<string, string>;
 }) {
   const [session, setSession] = useState<DaySession | null>(initialSession);
+  const [isInitial, setIsInitial] = useState(true);
   const [busy, setBusy] = useState<"" | "session" | "walk">("");
   const [error, setError] = useState<string | null>(null);
 
@@ -55,17 +60,32 @@ export function TodayClient({
     setError(null);
     const res = await generateTodaySession(fallbackWalk ? { fallbackWalk: true } : undefined);
     setBusy("");
-    if (res.ok) setSession(res.session);
-    else setError(res.error);
+    if (res.ok) {
+      setSession(res.session);
+      setIsInitial(false);
+    } else setError(res.error);
+  }
+
+  function rebuild() {
+    if (typeof window !== "undefined" && !window.confirm("Build a new session? This clears anything you've entered.")) return;
+    void generate(Boolean(session?.isFallbackWalk));
   }
 
   const hero = band != null && recoveryScore != null ? <RecoveryHero score={recoveryScore} band={band} /> : null;
 
   if (session) {
+    const sig = `${session.date}-${session.type}-${session.exercises.map((e) => e.exerciseId).join("-")}`;
     return (
       <div className="flex flex-col gap-4">
         {hero}
-        <SessionChecklist session={session} onRegenerate={() => generate(Boolean(session.isFallbackWalk))} regenBusy={busy !== ""} />
+        <SessionChecklist
+          key={sig}
+          session={session}
+          existingLog={isInitial ? existingLog : null}
+          lastByExercise={lastByExercise}
+          onRegenerate={rebuild}
+          regenBusy={busy !== ""}
+        />
       </div>
     );
   }

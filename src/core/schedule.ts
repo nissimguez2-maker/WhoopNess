@@ -20,10 +20,13 @@ export const DEFAULT_SCHEDULE: ScheduleSlot[] = [
   { day: "Thu", time: "18:00", type: "gym" },
 ];
 
-/** Today's scheduled slot, or null if nothing is scheduled today. */
-export function todaySlot(schedule: ScheduleSlot[], now = new Date()): ScheduleSlot | null {
-  const today = DAYS[now.getDay()];
-  return schedule.find((s) => s.day === today) ?? null;
+/**
+ * Today's scheduled slot, or null if nothing is scheduled today.
+ * `todayShort` is the local weekday ("Sun"…"Sat") — pass it from the date helper so
+ * the weekday matches the date key (never the server's UTC getDay()).
+ */
+export function todaySlot(schedule: ScheduleSlot[], todayShort: string = DAYS[new Date().getDay()]!): ScheduleSlot | null {
+  return schedule.find((s) => s.day === todayShort) ?? null;
 }
 
 export function dayLabel(day: string): string {

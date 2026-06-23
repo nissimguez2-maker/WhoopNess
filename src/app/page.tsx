@@ -9,21 +9,38 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getOwnerId } from "@/lib/owner";
 import { ensureUserBootstrap } from "@/lib/bootstrap";
 import { isWhoopConnected, getOwnerRecovery } from "@/lib/whoop/sync";
-import { ensureSchedule, loadDaySession } from "@/lib/plan/store";
+import { ensureSchedule, loadDaySession, loadRecentLogs, loadLogForDate } from "@/lib/plan/store";
 import { bandFor } from "@/lib/today";
 import { todaySlot } from "@/core/schedule";
-import type { DaySession, RecoveryBand, SessionType } from "@/core/types";
+import { todayKey, todayLabel, todayWeekday } from "@/lib/date";
+import type { RecentLogExercise } from "@/lib/plan/generate";
+import type { DaySession, LoggedSession, RecoveryBand, SessionType } from "@/core/types";
 
 export const dynamic = "force-dynamic";
 
+/** Short "last performed" string for an exercise, e.g. "60kg×10 @RPE8". */
+function fmtLast(e: RecentLogExercise): string {
+  const p: string[] = [];
+  if (e.weightKg != null) p.push(`${e.weightKg}kg${e.reps != null ? `×${e.reps}` : ""}`);
+  else if (e.reps != null) p.push(`×${e.reps}`);
+  if (e.rpe != null) p.push(`@RPE${e.rpe}`);
+  if (e.durationMin != null) p.push(`${e.durationMin}min`);
+  if (e.speedKmh != null) p.push(`${e.speedKmh}km/h`);
+  if (e.distanceKm != null) p.push(`${e.distanceKm}km`);
+  if (e.distanceM != null) p.push(`${e.distanceM}m`);
+  return p.join(" ");
+}
+
 export default async function Home() {
-  const today = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const today = todayLabel();
 
   let whoopConnected = false;
   let slotType: SessionType | null = null;
   let initialSession: DaySession | null = null;
   let recoveryScore: number | undefined;
   let band: RecoveryBand | null = null;
+  let existingLog: LoggedSession | null = null;
+  const lastByExercise: Record<string, string> = {};
 
   try {
     const admin = getSupabaseAdmin();
@@ -31,11 +48,26 @@ export default async function Home() {
     await ensureUserBootstrap(admin, ownerId);
     whoopConnected = await isWhoopConnected(ownerId);
 
-    const [schedule, recovery] = await Promise.all([ensureSchedule(admin, ownerId), getOwnerRecovery(ownerId)]);
-    slotType = todaySlot(schedule)?.type ?? null;
+    const date = todayKey();
+    const [schedule, recovery, recentLogs] = await Promise.all([
+      ensureSchedule(admin, ownerId),
+      getOwnerRecovery(ownerId),
+      loadRecentLogs(admin, ownerId, 8),
+    ]);
+    slotType = todaySlot(schedule, todayWeekday())?.type ?? null;
     recoveryScore = recovery?.recoveryScore;
     band = bandFor(recovery);
-    initialSession = await loadDaySession(admin, ownerId, new Date().toISOString().slice(0, 10));
+    initialSession = await loadDaySession(admin, ownerId, date);
+
+    for (const l of recentLogs) {
+      for (const e of l.exercises) {
+        if (e.exerciseId && !lastByExercise[e.exerciseId]) {
+          const s = fmtLast(e);
+          if (s) lastByExercise[e.exerciseId] = s;
+        }
+      }
+    }
+    if (initialSession) existingLog = await loadLogForDate(admin, ownerId, date, initialSession.type);
   } catch {
     whoopConnected = false;
   }
@@ -66,6 +98,8 @@ export default async function Home() {
         initialSession={initialSession}
         recoveryScore={recoveryScore}
         band={band}
+        existingLog={existingLog}
+        lastByExercise={lastByExercise}
       />
 
       <Link href="/week" className="text-center text-xs text-foreground-500">

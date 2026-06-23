@@ -57,7 +57,7 @@ export async function coachReply(history: CoachTurn[], userMessage: string, cont
     { role: "user", content: `<context>\n${ctx}\n</context>\n\n${userMessage}` },
   ];
 
-  const text = await llmComplete(messages, { maxTokens: 400 });
+  const text = await llmComplete(messages, { maxTokens: 700 });
   return { source: "coach", text: text ?? "" };
 }
 
